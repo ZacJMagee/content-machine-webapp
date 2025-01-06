@@ -68,7 +68,14 @@ export interface VideoSettings {
     prompt_optimizer: boolean;
     generation_type: 'image' | 'text';
     model: 'video-01';
+    promptOptimizer?: boolean;
+    showAdvanced?: boolean;
+    callbackUrl?: string;
+    generationType?: 'image' | 'text';
 }
+
+// Alias for backward compatibility
+export type GenerationSettings = VideoSettings;
 
 export const DEFAULT_VIDEO_SETTINGS: VideoSettings = {
     prompt_optimizer: true,

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Settings2, Info, ChevronDown, ChevronUp, ImageIcon, VideoIcon } from "lucide-react";
-import { GenerationSettings } from "../types";
+import { VideoSettings as GenerationSettings } from "@/types/video-generation";
 
 interface VideoSettingsColumnProps {
     settings: GenerationSettings;
