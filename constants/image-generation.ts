@@ -3,14 +3,14 @@
 export type PromptSuggestion = string;
 
 export const PROMPT_SUGGESTIONS: PromptSuggestion[] = [
-  "A serene landscape with mountains",
-  "A futuristic cityscape at night",
-  "An abstract pattern with vibrant colors",
-  "A photorealistic portrait",
-  "A whimsical fantasy scene",
-  "A detailed architectural rendering",
-  "A nature close-up with bokeh effect",
-  "A minimalist geometric composition"
+  "An image of hazellora looking at the camera",
+  "An image of hazellora looking out over the mountians, DLSR, UHD",
+  "An image of hazellora on a beach with a smile",
+  "A photorealistic portrait of hazellora",
+  "hazellora in a dance studio",
+  "hazellora holding a bunch of wild flowers",
+  "hazellora",
+  "hazellora sitting on the beach"
 ];
 
 export interface ImageSettings {
