@@ -1,4 +1,5 @@
 // constants/image-generation.ts
+import { ImageSettings } from '../types/image-generation';
 
 export type PromptSuggestion = string;
 
@@ -12,21 +13,6 @@ export const PROMPT_SUGGESTIONS: PromptSuggestion[] = [
   "hazellora",
   "hazellora sitting on the beach"
 ];
-
-export interface ImageSettings {
-  model: string;
-  go_fast: boolean;
-  lora_scale: number;
-  megapixels: string;
-  num_outputs: number;
-  aspect_ratio: string;
-  output_format: string;
-  guidance_scale: number;
-  output_quality: number;
-  prompt_strength: number;
-  extra_lora_scale: number;
-  num_inference_steps: number;
-}
 
 export const DEFAULT_IMAGE_SETTINGS: ImageSettings = {
   model: "dev",
