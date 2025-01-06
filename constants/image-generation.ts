@@ -28,3 +28,6 @@ export const DEFAULT_IMAGE_SETTINGS: ImageSettings = {
   extra_lora_scale: 1,
   num_inference_steps: 28
 };
+
+export type { ImageSettings } from '../types/image-generation';
+

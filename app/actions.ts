@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import Replicate from "replicate";
 import { ImageSettings } from '@/constants/image-generation';
 
+
 // Authentication Actions
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
