@@ -4,22 +4,32 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ImageIcon, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { ImageIcon, AlertCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { generateImage } from '@/app/actions';
-import { PROMPT_SUGGESTIONS, DEFAULT_IMAGE_SETTINGS, type ImageSettings } from '@/constants/image-generation';
-import { GenerationResponse } from '@/types/api';
+import { PROMPT_SUGGESTIONS, DEFAULT_IMAGE_SETTINGS } from '@/constants/image-generation';
+import type { ImageSettings } from '@/types/image-generation';
+import type { GenerationResponse } from '@/types/api';
 import DownloadButton from '@/components/DownloadButton';
 import ImageSettingsComponent from '@/components/ImageSettings';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const ImageGenerationPage = () => {
+interface GenerationProgress {
+    status: 'starting' | 'succeeded' | 'failed';
+    logs: string;
+    started_at: string;
+    completed_at?: string;
+    metrics?: {
+        predict_time: number;
+    };
+}
+
+function ImageGenerationPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [prompt, setPrompt] = useState('');
     const [settings, setSettings] = useState<ImageSettings>(DEFAULT_IMAGE_SETTINGS);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
     const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
 
     const handleAddSuggestion = (suggestion: string) => {
@@ -30,7 +40,9 @@ const ImageGenerationPage = () => {
         });
     };
 
-    const handleSubmit = async (e: React.MouseEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
         if (!prompt.trim()) {
             setError('Please provide a description for the image');
             return;
@@ -39,17 +51,19 @@ const ImageGenerationPage = () => {
         setIsLoading(true);
         setError(null);
         setGeneratedImage(null);
-        setGenerationProgress({
+        
+        const startProgress: GenerationProgress = {
             status: 'starting',
             logs: 'Initializing generation process...',
             started_at: new Date().toISOString()
-        });
+        };
+        setGenerationProgress(startProgress);
 
         try {
             const result = await generateImage({
                 prompt,
                 ...settings,
-                ...(settings.aspect_ratio === 'custom' ? {
+                ...(settings.aspect_ratio === 'custom' && settings.width && settings.height ? {
                     width: settings.width,
                     height: settings.height
                 } : {})
@@ -57,54 +71,62 @@ const ImageGenerationPage = () => {
 
             if (result.success && result.output) {
                 setGeneratedImage(result.output);
-                setGenerationProgress(prev => ({
-                    ...prev!,
+                const metrics = result.metrics?.predict_time 
+                    ? { predict_time: result.metrics.predict_time }
+                    : undefined;
+                    
+                setGenerationProgress({
                     status: 'succeeded',
                     logs: result.logs || 'Image generated successfully',
-                    metrics: result.metrics,
-                    completed_at: new Date().toISOString()
-                }));
+                    started_at: startProgress.started_at,
+                    completed_at: new Date().toISOString(),
+                    metrics
+                });
             } else {
                 throw new Error(result.error || 'Failed to generate image');
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
             setError(errorMessage);
-            setGenerationProgress(prev => ({
-                ...prev!,
+            setGenerationProgress({
                 status: 'failed',
                 logs: `Error: ${errorMessage}`,
+                started_at: startProgress.started_at,
                 completed_at: new Date().toISOString()
-            }));
+            });
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="h-screen w-screen flex flex-col">
-            <div className="flex-none p-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <h1 className="text-3xl font-bold flex items-center gap-2">
-                    <ImageIcon className="w-8 h-8" />
-                    Image Generation
-                </h1>
-                <p className="text-muted-foreground">
-                    Create AI-generated images from text descriptions
-                </p>
+        <div className="min-h-screen">
+            {/* Header */}
+            <div className="w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <div className="container mx-auto px-4 py-6">
+                    <h1 className="text-3xl font-bold flex items-center gap-2">
+                        <ImageIcon className="w-8 h-8" />
+                        Image Generation
+                    </h1>
+                    <p className="text-muted-foreground">
+                        Create AI-generated images from text descriptions
+                    </p>
+                </div>
             </div>
 
-            <div className="flex-1 grid grid-cols-3 gap-4 p-4 overflow-auto">
-                {/* Left Column - Prompt and Suggestions */}
-                <div className="h-full flex flex-col gap-4">
-                    <Card className="flex-1">
-                        <CardHeader>
-                            <CardTitle>Image Description</CardTitle>
+            {/* Main Content */}
+            <div className="container mx-auto px-4 py-8">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* Input Column */}
+                    <Card className="lg:col-span-3 lg:sticky lg:top-24 self-start">
+                        <CardHeader className="space-y-2">
+                            <CardTitle className="text-xl">Image Description</CardTitle>
                             <CardDescription>
                                 Describe what you want to generate
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-4">
+                            <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="space-y-2">
                                     <Label htmlFor="prompt">Description</Label>
                                     <Textarea
@@ -124,6 +146,7 @@ const ImageGenerationPage = () => {
                                                 key={suggestion}
                                                 variant="outline"
                                                 size="sm"
+                                                type="button"
                                                 onClick={() => handleAddSuggestion(suggestion)}
                                                 className="text-xs"
                                             >
@@ -134,66 +157,63 @@ const ImageGenerationPage = () => {
                                 </div>
 
                                 <Button
-                                    onClick={handleSubmit}
+                                    type="submit"
                                     disabled={isLoading || !prompt.trim()}
                                     className="w-full"
                                 >
                                     {isLoading ? 'Generating...' : 'Generate Image'}
                                 </Button>
-                            </div>
+                            </form>
                         </CardContent>
                     </Card>
-                </div>
 
-                {/* Middle Column - Image Preview */}
-                <div className="h-full flex flex-col gap-4">
-                    <Card className="flex-1">
-                        <CardHeader>
-                            <CardTitle>Generated Image</CardTitle>
+                    {/* Preview Column */}
+                    <Card className="lg:col-span-6 min-h-[700px]">
+                        <CardHeader className="space-y-2">
+                            <CardTitle className="text-xl">Generated Image</CardTitle>
                             <CardDescription>
                                 {generatedImage ? prompt : 'Your generated image will appear here'}
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="flex items-center justify-center p-4">
-                            {generatedImage ? (
-                                <div className="space-y-4 w-full">
-                                    <div className="relative rounded-lg overflow-hidden">
-                                        <img
-                                            src={generatedImage}
-                                            alt="Generated image"
-                                            className="w-full h-auto"
-                                        />
+                        <CardContent className="space-y-6">
+                            <div className="min-h-[500px] flex items-center justify-center rounded-lg border bg-muted/50 p-4">
+                                {generatedImage ? (
+                                    <div className="space-y-4 w-full p-2">
+                                        <div className="relative rounded-lg overflow-hidden bg-background">
+                                            <img
+                                                src={generatedImage}
+                                                alt={prompt}
+                                                className="w-full h-auto object-contain max-h-[600px]"
+                                            />
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <Button
+                                                onClick={() => window.open(generatedImage, '_blank')}
+                                                variant="outline"
+                                            >
+                                                Open Full Size
+                                            </Button>
+                                            <DownloadButton
+                                                imageUrl={generatedImage}
+                                                prompt={prompt}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="flex gap-3">
-                                        <Button
-                                            onClick={() => window.open(generatedImage, '_blank')}
-                                            variant="outline"
-                                        >
-                                            Open Full Size
-                                        </Button>
-                                        <DownloadButton
-                                            imageUrl={generatedImage}
-                                            prompt={prompt}
-                                        />
+                                ) : (
+                                    <div className="text-center text-muted-foreground p-4">
+                                        <ImageIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                                        <p>Your generated image will appear here</p>
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="text-center text-muted-foreground">
-                                    <ImageIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                                    <p>Your generated image will appear here</p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                                )}
+                            </div>
 
-                    {(error || generationProgress) && (
-                        <div className="space-y-4">
                             {error && (
                                 <Alert variant="destructive">
                                     <AlertCircle className="h-4 w-4" />
                                     <AlertDescription>{error}</AlertDescription>
                                 </Alert>
                             )}
+
                             {generationProgress && (
                                 <Card>
                                     <CardContent className="pt-6">
@@ -213,33 +233,28 @@ const ImageGenerationPage = () => {
                                     </CardContent>
                                 </Card>
                             )}
-                        </div>
-                    )}
-                </div>
+                        </CardContent>
+                    </Card>
 
-                {/* Right Column - Settings */}
-                <div className="h-full flex flex-col gap-4">
-                    <Card className="flex-1">
-                        <CardHeader>
-                            <CardTitle>Generation Settings</CardTitle>
+                    {/* Settings Column */}
+                    <Card className="lg:col-span-3 lg:sticky lg:top-24 self-start">
+                        <CardHeader className="space-y-2">
+                            <CardTitle className="text-xl">Generation Settings</CardTitle>
                             <CardDescription>
                                 Customize your image generation parameters
                             </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            <div className="space-y-6">
-                                <ImageSettingsComponent 
-                                    settings={settings}
-                                    onSettingsChange={setSettings}
-                                />
-                                
-                            </div>
+                        <CardContent className="pt-2">
+                            <ImageSettingsComponent
+                                settings={settings}
+                                onSettingsChange={setSettings}
+                            />
                         </CardContent>
                     </Card>
                 </div>
             </div>
         </div>
     );
-};
+}
 
 export default ImageGenerationPage;

@@ -7,20 +7,19 @@ import { ImageIcon, VideoIcon, UserIcon } from "lucide-react";
 import Link from "next/link";
 
 export default async function ProtectedPage() {
-  // Authentication check - remains the same
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
+  
   if (!user) {
     return redirect("/sign-in");
   }
-
+  
   return (
-    <div className="flex-1 w-full flex flex-col gap-8 p-8">
+    <div className="flex-1 container mx-auto px-4 py-8">
       {/* Welcome Section */}
-      <div className="space-y-2">
+      <div className="space-y-2 mb-8">
         <h1 className="text-3xl font-bold">Welcome, {user.email}</h1>
         <p className="text-muted-foreground">
           Choose what you'd like to create today
@@ -28,7 +27,7 @@ export default async function ProtectedPage() {
       </div>
 
       {/* Main Options Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {/* Image Generation Card */}
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
@@ -71,7 +70,7 @@ export default async function ProtectedPage() {
       </div>
 
       {/* User Profile Section */}
-      <Card className="mt-4">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserIcon size={20} />

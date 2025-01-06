@@ -18,6 +18,28 @@ export interface ImageSettings {
   extra_lora?: string;
   extra_lora_scale: number;
 }
+// Add the GenerationProgress interface
+export interface GenerationProgress {
+    status: 'starting' | 'succeeded' | 'failed';
+    logs: string;
+    started_at: string;
+    completed_at?: string;
+    metrics?: {
+        predict_time: number;
+    };
+}
+
+// Also add this interface if it's not already in your types/api.ts
+export interface GenerationResponse {
+    success: boolean;
+    output?: string;
+    error?: string;
+    logs?: string;
+    metrics?: {
+        predict_time: number;
+    };
+}
+
 
 export const DEFAULT_IMAGE_SETTINGS: ImageSettings = {
   aspect_ratio: '1:1',
