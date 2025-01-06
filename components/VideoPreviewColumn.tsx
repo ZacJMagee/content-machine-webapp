@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { AlertCircle, VideoIcon } from "lucide-react";
-import { GenerationProgress } from "../types";
+import { GenerationProgress } from "@/types/video-generation";
 
 interface VideoPreviewColumnProps {
     generatedVideo: string | null;

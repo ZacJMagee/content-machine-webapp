@@ -8,6 +8,12 @@ export interface VideoGenerationRequest {
     first_frame_image?: string;  // Base64 encoded image
     callback_url?: string;       // Optional for real-time updates
 }
+export type GenerationProgress = {
+    status: 'idle' | 'generating' | 'completed' | 'failed';
+    progress?: number;
+    message?: string;
+};
+
 
 // Response interfaces
 export interface VideoGenerationResponse {
