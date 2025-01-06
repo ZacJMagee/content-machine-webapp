@@ -6,6 +6,7 @@ import { VideoIcon } from 'lucide-react';
 import { VideoInputColumn } from '@/components/VideoInputColumn';
 import { VideoPreviewColumn } from '@/components/VideoPreviewColumn';
 import { VideoSettingsColumn } from '@/components/VideoSettingsColumn';
+
 import {
     VideoSettings,
     DEFAULT_VIDEO_SETTINGS,
@@ -13,15 +14,9 @@ import {
     VideoGenerationResponse,
     VideoStatusResponse,
     VideoFileResponse,
-    API_ERROR_CODES
+    API_ERROR_CODES,
+    GenerationProgress
 } from '@/types/video-generation';
-
-interface GenerationProgress {
-    status: 'idle' | 'preparing' | 'processing' | 'completed' | 'failed';
-    message: string;
-    timestamp: string;
-    progress?: number;
-}
 
 const VideoGenerationPage = () => {
     // Core state management
