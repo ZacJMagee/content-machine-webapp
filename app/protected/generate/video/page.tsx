@@ -6,14 +6,14 @@ import { VideoIcon } from 'lucide-react';
 import { VideoInputColumn } from '@/components/VideoInputColumn';
 import { VideoPreviewColumn } from '@/components/VideoPreviewColumn';
 import { VideoSettingsColumn } from '@/components/VideoSettingsColumn';
-import { 
-    VideoSettings, 
+import {
+    VideoSettings,
     DEFAULT_VIDEO_SETTINGS,
     VideoGenerationRequest,
     VideoGenerationResponse,
     VideoStatusResponse,
     VideoFileResponse,
-    API_ERROR_CODES 
+    API_ERROR_CODES
 } from '@/types/video-generation';
 
 interface GenerationProgress {
@@ -79,7 +79,7 @@ const VideoGenerationPage = () => {
 
         const previewUrl = URL.createObjectURL(file);
         const img = new Image();
-        
+
         img.onload = () => {
             if (img.width < 300 || img.height < 300) {
                 setError('Image must be at least 300px on each side');
@@ -136,9 +136,9 @@ const VideoGenerationPage = () => {
 
                 setGenerationProgress(prev => ({
                     ...prev,
-                    status: data.status === 'Success' ? 'completed' 
-                         : data.status === 'Failed' ? 'failed'
-                         : data.status.toLowerCase() as 'preparing' | 'processing',
+                    status: data.status === 'Success' ? 'completed'
+                        : data.status === 'Failed' ? 'failed'
+                            : data.status.toLowerCase() as 'preparing' | 'processing',
                     message: `Status: ${data.status} (${Math.round(progress)}%)`,
                     progress,
                     timestamp: new Date().toISOString()
@@ -226,7 +226,7 @@ const VideoGenerationPage = () => {
 
             const videoData: VideoFileResponse = await videoResponse.json();
             setGeneratedVideo(videoData.download_url);
-            
+
             setGenerationProgress(prev => ({
                 ...prev,
                 status: 'completed',
@@ -248,6 +248,11 @@ const VideoGenerationPage = () => {
 
     return (
         <div className="min-h-screen flex flex-col">
+            {/* Warning Banner */}
+            <div className="bg-yellow-200 text-yellow-900 text-center p-2 font-semibold">
+                ⚠️ This feature is currently under development and may not function as expected.
+            </div>
+
             {/* Header */}
             <div className="flex-none p-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="max-w-7xl mx-auto">
@@ -265,7 +270,7 @@ const VideoGenerationPage = () => {
             <div className="flex-1 p-4">
                 <div className="max-w-7xl mx-auto">
                     <div className="grid grid-cols-3 gap-4">
-                        <VideoInputColumn 
+                        <VideoInputColumn
                             settings={settings}
                             prompt={prompt}
                             isLoading={isLoading}
@@ -278,14 +283,14 @@ const VideoGenerationPage = () => {
                             onSubmit={handleSubmit}
                         />
 
-                        <VideoPreviewColumn 
+                        <VideoPreviewColumn
                             generatedVideo={generatedVideo}
                             error={error}
                             generationProgress={generationProgress}
                             prompt={prompt}
                         />
 
-                        <VideoSettingsColumn 
+                        <VideoSettingsColumn
                             settings={settings}
                             onSettingsChange={setSettings}
                         />
