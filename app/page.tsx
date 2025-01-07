@@ -14,7 +14,7 @@ export default async function Index() {
   return (
     <div className="flex-1 w-full flex flex-col gap-20 items-center">
       <div className="w-full min-h-screen flex flex-col items-center justify-center gap-6">
-        <h1 className="text-3xl font-bold">Welcome to [Your App Name]</h1>
+        <h1 className="text-3xl font-bold">Welcome to Realsim Content Generator</h1>
         {!user ? (
           <p>Please sign in to continue</p>
         ) : (
