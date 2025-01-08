@@ -107,7 +107,7 @@ export async function POST(request: Request) {
 
         // Step 3: Get download URL
         const downloadResponse = await fetch(
-            `https://api.minimaxi.chat/v1/files/retrieve?GroupId=${process.env.MINIMAX_GROUP_ID}&file_id=${fileId}`,
+            `https://api.minimaxi.chat/v1/files/retrieve?group_id=${process.env.MINIMAX_GROUP_ID}&file_id=${fileId}`,
             {
                 headers: {
                     'content-type': 'application/json',
@@ -125,13 +125,12 @@ export async function POST(request: Request) {
 
         const downloadData: VideoFileResponse = await downloadResponse.json();
 
-        // Return success response with download URL
         return NextResponse.json({
             success: true,
-            output: downloadData.download_url,
+            output: downloadData.file.download_url,
             taskId,
             fileId,
-            filename: downloadData.filename
+            filename: downloadData.file.filename
         });
 
     } catch (error) {
