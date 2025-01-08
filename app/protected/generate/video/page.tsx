@@ -1,4 +1,3 @@
-// app/protected/generate/video/page.tsx
 'use client';
 
 import { useState } from 'react';
@@ -14,16 +13,51 @@ import {
     VideoGenerationResponse,
     VideoStatusResponse,
     VideoFileResponse,
-    API_ERROR_CODES,
     GenerationProgress
 } from '@/types/video-generation';
+
+// API Constants based on documentation
+const API_CONFIG = {
+    baseUrl: 'https://api.minimaxi.chat/v1',
+    endpoints: {
+        generate: '/video_generation',
+        status: '/query/video_generation',
+        retrieve: '/files/retrieve'
+    },
+    statuses: {
+        PREPARING: 'Preparing',
+        PROCESSING: 'Processing',
+        SUCCESS: 'Success',
+        FAIL: 'Fail'
+    },
+    errorCodes: {
+        SUCCESS: 0,
+        RATE_LIMIT: 1002,
+        AUTH_FAILED: 1004,
+        INSUFFICIENT_BALANCE: 1008,
+        INVALID_PARAMS: 1013,
+        SENSITIVE_CONTENT: 1026,
+        INVALID_API_KEY: 2049
+    },
+    polling: {
+        maxAttempts: 120,
+        interval: 1000,
+        timeout: 120000 // 2 minutes
+    }
+};
+
+// Logging utility for better debugging
+const debugLog = (context: string, data: any) => {
+    const timestamp = new Date().toISOString();
+    console.debug(`[${timestamp}] [${context}]`, JSON.stringify(data, null, 2));
+};
 
 const VideoGenerationPage = () => {
     // Core state management
     const [isLoading, setIsLoading] = useState(false);
     const [prompt, setPrompt] = useState('');
     const [error, setError] = useState<string | null>(null);
-    const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
+    const [videoData, setVideoData] = useState<VideoFileResponse | null>(null);
     const [settings, setSettings] = useState<VideoSettings>(DEFAULT_VIDEO_SETTINGS);
     const [generationProgress, setGenerationProgress] = useState<GenerationProgress>({
         status: 'idle',
@@ -35,7 +69,60 @@ const VideoGenerationPage = () => {
     const [firstFrame, setFirstFrame] = useState<File | null>(null);
     const [firstFramePreview, setFirstFramePreview] = useState<string | null>(null);
 
-    // Helper functions
+    // Helper function to make API requests with proper error handling
+    const makeApiRequest = async (endpoint: string, options: RequestInit = {}) => {
+        const requestId = Math.random().toString(36).substring(7);
+        const url = `${API_CONFIG.baseUrl}${endpoint}`;
+
+        debugLog('API Request', {
+            requestId,
+            url,
+            method: options.method || 'GET'
+        });
+
+        try {
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.NEXT_PUBLIC_MINIMAX_API_KEY}`,
+                    ...options.headers
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            debugLog('API Response', { requestId, data });
+
+            // Check for API-specific error codes
+            if (data.base_resp?.status_code !== API_CONFIG.errorCodes.SUCCESS) {
+                throw new Error(getErrorMessage(data.base_resp?.status_code));
+            }
+
+            return data;
+        } catch (error) {
+            debugLog('API Error', { requestId, error: error instanceof Error ? error.message : 'Unknown error' });
+            throw error;
+        }
+    };
+
+    // Helper function for handling error codes
+    const getErrorMessage = (code: number): string => {
+        const errorMessages: Record<number, string> = {
+            [API_CONFIG.errorCodes.RATE_LIMIT]: 'Rate limit exceeded. Please try again later.',
+            [API_CONFIG.errorCodes.AUTH_FAILED]: 'Authentication failed. Please check your API key.',
+            [API_CONFIG.errorCodes.INSUFFICIENT_BALANCE]: 'Insufficient account balance.',
+            [API_CONFIG.errorCodes.INVALID_PARAMS]: 'Invalid parameters provided.',
+            [API_CONFIG.errorCodes.SENSITIVE_CONTENT]: 'Content flagged as sensitive.',
+            [API_CONFIG.errorCodes.INVALID_API_KEY]: 'Invalid API key.',
+        };
+        return errorMessages[code] || 'An unknown error occurred';
+    };
+
+    // Helper function for base64 conversion
     const imageToBase64 = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -45,14 +132,87 @@ const VideoGenerationPage = () => {
         });
     };
 
+    // Function to poll for video generation status
+    const pollGenerationStatus = async (taskId: string): Promise<string> => {
+        const MAX_POLL_TIME = 15 * 60 * 1000;  // 15 minutes in milliseconds
+        const POLL_INTERVAL = 2000;             // 2 seconds between polls
+        let attempts = 0;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < MAX_POLL_TIME) {
+            try {
+                const data = await makeApiRequest(`${API_CONFIG.endpoints.status}?task_id=${taskId}`);
+
+                const elapsed = Date.now() - startTime;
+                attempts++;
+
+                // Log current status
+                debugLog('Progress Update', {
+                    taskId,
+                    status: data.status,
+                    progress: getProgressFromStatus(data.status, elapsed, MAX_POLL_TIME),
+                    attempt: attempts,
+                    elapsed
+                });
+
+                // Update UI progress
+                setGenerationProgress(prev => ({
+                    ...prev,
+                    status: data.status.toLowerCase() as GenerationProgress['status'],
+                    message: `Status: ${data.status}`,
+                    progress: getProgressFromStatus(data.status, elapsed, MAX_POLL_TIME),
+                    timestamp: new Date().toISOString()
+                }));
+
+                if (data.status === API_CONFIG.statuses.SUCCESS && data.file_id) {
+                    return data.file_id;
+                }
+
+                if (data.status === API_CONFIG.statuses.FAIL) {
+                    throw new Error(data.base_resp.status_msg || 'Video generation failed');
+                }
+
+                // Wait before next poll
+                await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+            } catch (error) {
+                debugLog('Polling Error', {
+                    taskId,
+                    attempt: attempts,
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                });
+                throw error;
+            }
+        }
+
+        throw new Error(`Video generation timed out after ${MAX_POLL_TIME / 1000 / 60} minutes`);
+    };
+
+    // Helper function to calculate progress
+    const getProgressFromStatus = (status: string, elapsed: number, maxTime: number): number => {
+        switch (status) {
+            case API_CONFIG.statuses.PREPARING:
+                return Math.min(25, (elapsed / maxTime) * 100);
+            case API_CONFIG.statuses.PROCESSING:
+                // Scale from 25% to 95% based on elapsed time
+                const progressPercent = (elapsed / maxTime) * 70;  // 70% range (95-25)
+                return Math.min(95, 25 + progressPercent);
+            case API_CONFIG.statuses.SUCCESS:
+                return 100;
+            case API_CONFIG.statuses.FAIL:
+                return 0;
+            default:
+                return 0;
+        }
+    };
+
+    // Event handlers
     const handleGenerationTypeChange = (value: 'image' | 'text') => {
         setSettings(prev => ({
             ...prev,
             generation_type: value
         }));
         if (value === 'text') {
-            setFirstFrame(null);
-            setFirstFramePreview(null);
+            handleRemoveImage();
         }
         setError(null);
     };
@@ -111,57 +271,10 @@ const VideoGenerationPage = () => {
         setError(null);
     };
 
-    const pollGenerationStatus = async (taskId: string): Promise<string> => {
-        const maxAttempts = 60;
-        let attempts = 0;
-
-        while (attempts < maxAttempts) {
-            try {
-                const response = await fetch(
-                    `${process.env.NEXT_PUBLIC_API_URL}/video/status?task_id=${taskId}`,
-                    { credentials: 'include' }
-                );
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const data: VideoStatusResponse = await response.json();
-                const progress = Math.min((attempts / maxAttempts) * 100, 90);
-
-                setGenerationProgress(prev => ({
-                    ...prev,
-                    status: data.status === 'Success' ? 'completed'
-                        : data.status === 'Failed' ? 'failed'
-                            : data.status.toLowerCase() as 'preparing' | 'processing',
-                    message: `Status: ${data.status} (${Math.round(progress)}%)`,
-                    progress,
-                    timestamp: new Date().toISOString()
-                }));
-
-                if (data.status === 'Success' && data.file_id) {
-                    return data.file_id;
-                }
-
-                if (data.status === 'Failed') {
-                    throw new Error(data.base_resp.status_msg || 'Video generation failed');
-                }
-
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                attempts++;
-
-            } catch (error) {
-                console.error('Error in pollGenerationStatus:', error);
-                throw error;
-            }
-        }
-
-        throw new Error('Generation timed out');
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        setVideoData(null);
 
         if (settings.generation_type === 'image' && !firstFrame) {
             setError('Please upload an image first');
@@ -182,54 +295,48 @@ const VideoGenerationPage = () => {
                 progress: 0
             });
 
-            const requestData = {
-                model: settings.model,
+            const requestData: VideoGenerationRequest = {
+                model: 'video-01',
                 prompt: prompt.trim() || undefined,
-                prompt_optimizer: settings.prompt_optimizer,
-                first_frame_image: undefined as string | undefined
-            } satisfies VideoGenerationRequest;
+                prompt_optimizer: settings.prompt_optimizer
+            };
 
             if (settings.generation_type === 'image' && firstFrame) {
+                debugLog('Processing Image', {
+                    fileName: firstFrame.name,
+                    fileSize: firstFrame.size,
+                    fileType: firstFrame.type
+                });
                 requestData.first_frame_image = await imageToBase64(firstFrame);
             }
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/video/generate`, {
+            // Generate video
+            const generationResponse = await makeApiRequest(API_CONFIG.endpoints.generate, {
                 method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(requestData)
             });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.base_resp?.status_msg || 'Failed to start generation');
-            }
+            // Poll for completion
+            const fileId = await pollGenerationStatus(generationResponse.task_id);
 
-            const data: VideoGenerationResponse = await response.json();
-            const fileId = await pollGenerationStatus(data.task_id);
+            // Retrieve video URL
+            const videoResponse = await makeApiRequest(
+                `${API_CONFIG.endpoints.retrieve}?group_id=${process.env.NEXT_PUBLIC_GROUP_ID}&file_id=${fileId}`
+            ) as VideoFileResponse;
 
-            const videoResponse = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/video/retrieve?file_id=${fileId}`,
-                { credentials: 'include' }
-            );
-
-            if (!videoResponse.ok) {
-                throw new Error('Failed to get video URL');
-            }
-
-            const videoData: VideoFileResponse = await videoResponse.json();
-            setGeneratedVideo(videoData.download_url);
-
-            setGenerationProgress(prev => ({
-                ...prev,
+            setVideoData(videoResponse);
+            setGenerationProgress({
                 status: 'completed',
                 message: 'Video generated successfully!',
-                progress: 100
-            }));
+                progress: 100,
+                timestamp: new Date().toISOString()
+            });
 
         } catch (err) {
+            debugLog('Generation Error', {
+                error: err instanceof Error ? err.message : 'Unknown error'
+            });
+
             setError(err instanceof Error ? err.message : 'Failed to generate video');
             setGenerationProgress(prev => ({
                 ...prev,
@@ -279,7 +386,7 @@ const VideoGenerationPage = () => {
                         />
 
                         <VideoPreviewColumn
-                            generatedVideo={generatedVideo}
+                            generatedVideo={videoData?.file?.download_url || null}
                             error={error}
                             generationProgress={generationProgress}
                             prompt={prompt}
