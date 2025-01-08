@@ -36,12 +36,14 @@ export interface VideoStatusResponse {
 }
 
 export interface VideoFileResponse {
-    file_id: string;
-    bytes: number;
-    created_at: number;
-    filename: string;
-    purpose: string;
-    download_url: string;
+    file: {
+        file_id: number;
+        bytes: number;
+        created_at: number;
+        filename: string;
+        purpose: string;
+        download_url: string;
+    };
     base_resp: {
         status_code: number;
         status_msg: string;
