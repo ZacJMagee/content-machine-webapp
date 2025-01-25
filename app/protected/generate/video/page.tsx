@@ -391,11 +391,14 @@ const VideoGenerationPage = () => {
                             generationProgress={generationProgress}
                             prompt={prompt}
                         />
-
                         <VideoSettingsColumn
                             settings={settings}
                             onSettingsChange={setSettings}
+                            firstFrame={firstFrame}
+                            isLoading={isLoading}
+                            videoUrl={videoData?.file?.download_url}
                         />
+
                     </div>
                 </div>
             </div>
