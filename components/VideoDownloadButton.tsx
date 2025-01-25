@@ -1,4 +1,5 @@
-// components/VideoDownloadButton.tsx
+'use client';
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { SaveIcon } from "lucide-react";
@@ -6,14 +7,14 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface VideoDownloadButtonProps {
-  videoUrl: string | null;
+  fileId: string;
   prompt: string;
   disabled?: boolean;
   onError?: (error: string) => void;
 }
 
 const VideoDownloadButton = ({ 
-  videoUrl, 
+  fileId, 
   prompt, 
   disabled = false,
   onError 
@@ -22,34 +23,32 @@ const VideoDownloadButton = ({
   const [error, setError] = useState<string | null>(null);
 
   const handleDownload = async () => {
-    if (!videoUrl) return;
+    if (!fileId) return;
     
     try {
       setDownloading(true);
       setError(null);
       
       console.log('Starting video download:', {
-        url: videoUrl,
-        prompt,
+        fileId,
         timestamp: new Date().toISOString()
       });
 
-      // Fetch the video file
-      const response = await fetch(videoUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'video/mp4,video/*;q=0.8,*/*;q=0.5',
-        }
-      });
+      // Use the video generation endpoint with GET method
+      const response = await fetch(`/api/generate-video?fileId=${fileId}`);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
       }
       
-      // Get the blob data
       const blob = await response.blob();
       
-      // Create filename from prompt and date
+      if (blob.size === 0) {
+        throw new Error('Downloaded file is empty');
+      }
+
+      // Create filename
       const timestamp = new Date().toISOString().split('T')[0];
       const baseFilename = prompt
         .split(' ')
@@ -60,40 +59,30 @@ const VideoDownloadButton = ({
       
       const filename = `${baseFilename}-${timestamp}.mp4`;
       
-      // Create download link
-      const url = URL.createObjectURL(blob);
+      // Create and trigger download
+      const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = downloadUrl;
       a.download = filename;
       document.body.appendChild(a);
       
-      console.log('Downloading video:', {
+      console.log('Initiating download:', {
         filename,
         size: blob.size,
-        type: blob.type,
-        timestamp: new Date().toISOString()
+        type: blob.type
       });
 
-      // Trigger download
       a.click();
       
       // Cleanup
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(downloadUrl);
 
-      console.log('Video download completed:', {
-        filename,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Video download error:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        url: videoUrl,
-        timestamp: new Date().toISOString()
-      });
+      console.log('Download completed successfully');
       
-      const errorMessage = error instanceof Error ? error.message : 'Failed to download video';
+    } catch (err) {
+      console.error('Download failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to download video';
       setError(errorMessage);
       onError?.(errorMessage);
     } finally {
@@ -105,14 +94,13 @@ const VideoDownloadButton = ({
     <div className="space-y-2">
       <Button
         onClick={handleDownload}
-        disabled={disabled || !videoUrl || downloading}
+        disabled={disabled || !fileId || downloading}
         variant="outline"
         className="gap-2"
       >
         <SaveIcon className="w-4 h-4" />
         {downloading ? 'Downloading...' : 'Save to Computer'}
       </Button>
-
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />

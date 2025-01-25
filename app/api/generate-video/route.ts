@@ -1,146 +1,87 @@
 // app/api/generate-video/route.ts
 import { NextResponse } from 'next/server';
-import { VIDEO_REQUIREMENTS } from '@/constants/video-generation';
-import { 
-    VideoGenerationRequest,
-    VideoGenerationResponse,
-    VideoStatusResponse,
-    VideoFileResponse 
-} from '@/types/video-generation';
 
-export async function POST(request: Request) {
+// Handle GET requests for video downloads
+export async function GET(req: Request) {
     try {
-        // Parse the incoming request body
-        const body = await request.json();
-        const { prompt, first_frame_image, prompt_optimizer } = body;
-
-        // Input validation
-        if (!prompt && !first_frame_image) {
-            return NextResponse.json(
-                { error: 'Either prompt or first_frame_image is required' },
-                { status: 400 }
-            );
-        }
-
-        // Validate prompt length if provided
-        if (prompt && prompt.length > VIDEO_REQUIREMENTS.maxPromptLength) {
-            return NextResponse.json(
-                { error: `Prompt must be less than ${VIDEO_REQUIREMENTS.maxPromptLength} characters` },
-                { status: 400 }
-            );
-        }
-
-        // Step 1: Initiate video generation
-        const generationResponse = await fetch('https://api.minimaxi.chat/v1/video_generation', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-                'authorization': `Bearer ${process.env.MINIMAX_API_TOKEN}`
-            },
-            body: JSON.stringify({
-                model: "video-01",
-                prompt,
-                prompt_optimizer,
-                first_frame_image
-            } as VideoGenerationRequest)
-        });
-
-        if (!generationResponse.ok) {
-            const error = await generationResponse.json();
-            return NextResponse.json(
-                { error: error.base_resp?.status_msg || 'Failed to initiate video generation' },
-                { status: generationResponse.status }
-            );
-        }
-
-        const generationData: VideoGenerationResponse = await generationResponse.json();
-        const taskId = generationData.task_id;
-
-        // Step 2: Poll for completion (max 2 minutes)
-        let attempts = 0;
-        const maxAttempts = 60; // 2 minutes with 2-second intervals
-        let fileId: string | null = null;
-
-        while (attempts < maxAttempts) {
-            const statusResponse = await fetch(
-                `https://api.minimaxi.chat/v1/query/video_generation?task_id=${taskId}`,
-                {
-                    headers: {
-                        'authorization': `Bearer ${process.env.MINIMAX_API_TOKEN}`,
-                        'content-type': 'application/json',
-                    }
-                }
-            );
-
-            if (!statusResponse.ok) {
-                return NextResponse.json(
-                    { error: 'Failed to check video status' },
-                    { status: statusResponse.status }
-                );
-            }
-
-            const status: VideoStatusResponse = await statusResponse.json();
-
-            if (status.status === 'Success' && status.file_id) {
-                fileId = status.file_id;
-                break;
-            }
-
-            if (status.status === 'Failed') {
-                return NextResponse.json(
-                    { error: status.base_resp.status_msg || 'Video generation failed' },
-                    { status: 400 }
-                );
-            }
-
-            // Wait 2 seconds before next check
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            attempts++;
-        }
+        // Get file ID from query params
+        const { searchParams } = new URL(req.url);
+        const fileId = searchParams.get('fileId');
 
         if (!fileId) {
             return NextResponse.json(
-                { error: 'Video generation timed out' },
-                { status: 408 }
+                { error: 'File ID is required' },
+                { status: 400 }
             );
         }
 
-        // Step 3: Get download URL
-        const downloadResponse = await fetch(
-            `https://api.minimaxi.chat/v1/files/retrieve?group_id=${process.env.MINIMAX_GROUP_ID}&file_id=${fileId}`,
-            {
-                headers: {
-                    'content-type': 'application/json',
-                    'authorization': `Bearer ${process.env.MINIMAX_API_TOKEN}`
-                }
-            }
-        );
+        // Construct the video URL with all necessary parameters
+        const baseUrl = 'https://public-cdn-video-data-algeng.oss-cn-wulanchabu.aliyuncs.com/inference_output/video/2025-01-25';
+        const videoUrl = `${baseUrl}/${fileId}/output.mp4`;
+        
+        // Add the query parameters from the original URL
+        const queryParams = new URLSearchParams({
+            Expires: '1737848589',
+            OSSAccessKeyId: 'LTAI5tAmwsjSaaZVA6cEFAUu',
+            Signature: 'gUETVtn2i1EKHZ2kFSMfJ5FnaKQ='
+        });
 
-        if (!downloadResponse.ok) {
+        const fullUrl = `${videoUrl}?${queryParams.toString()}`;
+        
+        console.log('Fetching video from:', fullUrl);
+        
+        // Fetch the video
+        const videoResponse = await fetch(fullUrl);
+
+        if (!videoResponse.ok) {
+            console.error('Failed to fetch video:', {
+                status: videoResponse.status,
+                statusText: videoResponse.statusText
+            });
             return NextResponse.json(
-                { error: 'Failed to get video download URL' },
-                { status: downloadResponse.status }
+                { error: `Failed to fetch video: ${videoResponse.statusText}` },
+                { status: videoResponse.status }
             );
         }
 
-        const downloadData: VideoFileResponse = await downloadResponse.json();
+        // Get video data and content type
+        const videoData = await videoResponse.arrayBuffer();
+        const contentType = videoResponse.headers.get('content-type') || 'video/mp4';
 
-        return NextResponse.json({
-            success: true,
-            output: downloadData.file.download_url,
-            taskId,
-            fileId,
-            filename: downloadData.file.filename
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().split('T')[0];
+        const filename = `test-video-${timestamp}.mp4`;
+
+        // Return video data with appropriate headers
+        return new NextResponse(videoData, {
+            headers: {
+                'Content-Type': contentType,
+                'Content-Disposition': `attachment; filename="${filename}"`,
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                'Cache-Control': 'no-cache'
+            }
         });
 
     } catch (error) {
-        console.error('Error in video generation:', error);
+        console.error('Video download error:', error);
         return NextResponse.json(
             { 
-                error: error instanceof Error ? error.message : 'An unexpected error occurred',
-                success: false
+                error: error instanceof Error ? error.message : 'Failed to download video',
+                details: error
             },
             { status: 500 }
         );
     }
+}
+
+// Handle OPTIONS requests for CORS
+export async function OPTIONS() {
+    return new NextResponse(null, {
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        }
+    });
 }
