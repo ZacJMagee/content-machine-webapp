@@ -5,10 +5,25 @@ import { Settings, LogOut, Image, Video, Brain, ArrowUpCircle, HelpCircle, Home,
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/utils/supabase/client';
+import { User } from '@supabase/supabase-js';
+
+interface GuideCard {
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  gradient: string;
+}
+
+interface MenuItem {
+  id: string;
+  icon: React.ElementType;
+  label: string;
+  path: string;
+}
 
 export default function ProtectedPage() {
-  const [activeTab, setActiveTab] = useState('home');
-  const [user, setUser] = useState(null);
+  const [activeTab, setActiveTab] = useState<string>('home');
+  const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -20,7 +35,7 @@ export default function ProtectedPage() {
     checkUser();
   }, []);
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     { id: 'home', icon: Home, label: 'Overview', path: '/protected' },
     { id: 'image', icon: Image, label: 'Image Generation', path: '/protected/generate/image' },
     { id: 'video', icon: Video, label: 'Video Generation', path: '/protected/generate/video' },
@@ -31,7 +46,7 @@ export default function ProtectedPage() {
     { id: 'upscale', icon: ArrowUpCircle, label: 'Upscaler', path: '#' }
   ];
 
-  const guideCards = [
+  const guideCards: GuideCard[] = [
     {
       title: "Master Image Generation",
       description: "Learn how to create stunning images with Flux AI. From basic prompts to advanced techniques.",
@@ -64,7 +79,7 @@ export default function ProtectedPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-900 to-black text-white">
+    <div className="flex h-screen bg-[#0a0a0f] text-white">
       {/* Sidebar */}
       <div className="w-64 border-r border-gray-800/50 flex flex-col backdrop-blur-sm bg-black/20">
         <div className="p-6 border-b border-gray-800/50">
