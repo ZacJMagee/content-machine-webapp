@@ -100,158 +100,155 @@ function ImageGenerationPage() {
     };
 
     return (
-        <div className="min-h-screen">
-            {/* Header */}
-            <div className="w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="container mx-auto px-4 py-6">
-                    <h1 className="text-3xl font-bold flex items-center gap-2">
-                        <ImageIcon className="w-8 h-8" />
-                        Image Generation
-                    </h1>
-                    <p className="text-muted-foreground">
-                        Create AI-generated images from text descriptions
-                    </p>
-                </div>
+        <div className="flex-1 overflow-auto bg-[#0a0a0f] p-8">
+            {/* Page Title */}
+            <div className="mb-8">
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent flex items-center gap-2">
+                    <ImageIcon className="w-8 h-8" />
+                    Image Generation
+                </h2>
+                <p className="text-gray-400 mt-2">
+                    Create AI-generated images from text descriptions
+                </p>
             </div>
 
             {/* Main Content */}
-            <div className="container mx-auto px-4 py-8">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    {/* Input Column */}
-                    <Card className="lg:col-span-3 lg:sticky lg:top-24 self-start">
-                        <CardHeader className="space-y-2">
-                            <CardTitle className="text-xl">Image Description</CardTitle>
-                            <CardDescription>
-                                Describe what you want to generate
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                <div className="space-y-2">
-                                    <Label htmlFor="prompt">Description</Label>
-                                    <Textarea
-                                        id="prompt"
-                                        placeholder="Describe the image you want to generate..."
-                                        value={prompt}
-                                        onChange={(e) => setPrompt(e.target.value)}
-                                        className="h-32 resize-none"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Style Suggestions</Label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {PROMPT_SUGGESTIONS.map((suggestion) => (
-                                            <Button
-                                                key={suggestion}
-                                                variant="outline"
-                                                size="sm"
-                                                type="button"
-                                                onClick={() => handleAddSuggestion(suggestion)}
-                                                className="text-xs"
-                                            >
-                                                {suggestion}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <Button
-                                    type="submit"
-                                    disabled={isLoading || !prompt.trim()}
-                                    className="w-full"
-                                >
-                                    {isLoading ? 'Generating...' : 'Generate Image'}
-                                </Button>
-                            </form>
-                        </CardContent>
-                    </Card>
-
-                    {/* Preview Column */}
-                    <Card className="lg:col-span-6 min-h-[700px]">
-                        <CardHeader className="space-y-2">
-                            <CardTitle className="text-xl">Generated Image</CardTitle>
-                            <CardDescription>
-                                {generatedImage ? prompt : 'Your generated image will appear here'}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="min-h-[500px] flex items-center justify-center rounded-lg border bg-muted/50 p-4">
-                                {generatedImage ? (
-                                    <div className="space-y-4 w-full p-2">
-                                        <div className="relative rounded-lg overflow-hidden bg-background">
-                                            <img
-                                                src={generatedImage}
-                                                alt={prompt}
-                                                className="w-full h-auto object-contain max-h-[600px]"
-                                            />
-                                        </div>
-                                        <div className="flex gap-3">
-                                            <Button
-                                                onClick={() => window.open(generatedImage, '_blank')}
-                                                variant="outline"
-                                            >
-                                                Open Full Size
-                                            </Button>
-                                            <DownloadButton
-                                                imageUrl={generatedImage}
-                                                prompt={prompt}
-                                            />
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-center text-muted-foreground p-4">
-                                        <ImageIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                                        <p>Your generated image will appear here</p>
-                                    </div>
-                                )}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Input Column */}
+                <Card className="lg:col-span-3 lg:sticky lg:top-8 self-start border-gray-800/50 bg-black/20 backdrop-blur-sm">
+                    <CardHeader className="space-y-2">
+                        <CardTitle className="text-xl">Image Description</CardTitle>
+                        <CardDescription className="text-gray-400">
+                            Describe what you want to generate
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="space-y-2">
+                                <Label htmlFor="prompt">Description</Label>
+                                <Textarea
+                                    id="prompt"
+                                    placeholder="Describe the image you want to generate..."
+                                    value={prompt}
+                                    onChange={(e) => setPrompt(e.target.value)}
+                                    className="h-32 resize-none bg-gray-900/50 border-gray-800/50"
+                                />
                             </div>
 
-                            {error && (
-                                <Alert variant="destructive">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertDescription>{error}</AlertDescription>
-                                </Alert>
-                            )}
+                            <div className="space-y-2">
+                                <Label>Style Suggestions</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {PROMPT_SUGGESTIONS.map((suggestion) => (
+                                        <Button
+                                            key={suggestion}
+                                            variant="outline"
+                                            size="sm"
+                                            type="button"
+                                            onClick={() => handleAddSuggestion(suggestion)}
+                                            className="text-xs border-gray-800/50 bg-gray-900/50 hover:bg-gray-800/50"
+                                        >
+                                            {suggestion}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
 
-                            {generationProgress && (
-                                <Card>
-                                    <CardContent className="pt-6">
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-sm font-medium">
-                                                Status: {generationProgress.status.charAt(0).toUpperCase() + generationProgress.status.slice(1)}
-                                            </p>
-                                            {generationProgress.metrics?.predict_time && (
-                                                <p className="text-sm text-muted-foreground">
-                                                    Generation time: {generationProgress.metrics.predict_time.toFixed(2)}s
-                                                </p>
-                                            )}
-                                        </div>
-                                        <p className="text-sm text-muted-foreground mt-2">
-                                            {generationProgress.logs}
+                            <Button
+                                type="submit"
+                                disabled={isLoading || !prompt.trim()}
+                                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600"
+                            >
+                                {isLoading ? 'Generating...' : 'Generate Image'}
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+
+                {/* Preview Column */}
+                <Card className="lg:col-span-6 min-h-[700px] border-gray-800/50 bg-black/20 backdrop-blur-sm">
+                    <CardHeader className="space-y-2">
+                        <CardTitle className="text-xl">Generated Image</CardTitle>
+                        <CardDescription className="text-gray-400">
+                            {generatedImage ? prompt : 'Your generated image will appear here'}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="min-h-[500px] flex items-center justify-center rounded-lg border border-gray-800/50 bg-gray-900/20 p-4">
+                            {generatedImage ? (
+                                <div className="space-y-4 w-full p-2">
+                                    <div className="relative rounded-lg overflow-hidden bg-gray-900/50">
+                                        <img
+                                            src={generatedImage}
+                                            alt={prompt}
+                                            className="w-full h-auto object-contain max-h-[600px]"
+                                        />
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <Button
+                                            onClick={() => window.open(generatedImage, '_blank')}
+                                            variant="outline"
+                                            className="border-gray-800/50 bg-gray-900/50 hover:bg-gray-800/50"
+                                        >
+                                            Open Full Size
+                                        </Button>
+                                        <DownloadButton
+                                            imageUrl={generatedImage}
+                                            prompt={prompt}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center text-gray-400 p-4">
+                                    <ImageIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                                    <p>Your generated image will appear here</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {error && (
+                            <Alert variant="destructive" className="bg-red-900/20 border-red-900/50">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription className="text-red-400">{error}</AlertDescription>
+                            </Alert>
+                        )}
+
+                        {generationProgress && (
+                            <Card className="border-gray-800/50 bg-black/20 backdrop-blur-sm">
+                                <CardContent className="pt-6">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm font-medium">
+                                            Status: {generationProgress.status.charAt(0).toUpperCase() + generationProgress.status.slice(1)}
                                         </p>
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </CardContent>
-                    </Card>
+                                        {generationProgress.metrics?.predict_time && (
+                                            <p className="text-sm text-gray-400">
+                                                Generation time: {generationProgress.metrics.predict_time.toFixed(2)}s
+                                            </p>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-gray-400 mt-2">
+                                        {generationProgress.logs}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </CardContent>
+                </Card>
 
-                    {/* Settings Column */}
-                    <Card className="lg:col-span-3 lg:sticky lg:top-24 self-start">
-                        <CardHeader className="space-y-2">
-                            <CardTitle className="text-xl">Generation Settings</CardTitle>
-                            <CardDescription>
-                                Customize your image generation parameters
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="pt-2">
-                            <ImageSettingsComponent
-                                settings={settings}
-                                onSettingsChange={setSettings}
-                            />
-                        </CardContent>
-                    </Card>
-                </div>
+                {/* Settings Column */}
+                <Card className="lg:col-span-3 lg:sticky lg:top-8 self-start border-gray-800/50 bg-black/20 backdrop-blur-sm">
+                    <CardHeader className="space-y-2">
+                        <CardTitle className="text-xl">Generation Settings</CardTitle>
+                        <CardDescription className="text-gray-400">
+                            Customize your image generation parameters
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-2">
+                        <ImageSettingsComponent
+                            settings={settings}
+                            onSettingsChange={setSettings}
+                        />
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );
