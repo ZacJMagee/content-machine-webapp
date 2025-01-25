@@ -5,6 +5,8 @@ import { VideoIcon } from 'lucide-react';
 import { VideoInputColumn } from '@/components/VideoInputColumn';
 import { VideoPreviewColumn } from '@/components/VideoPreviewColumn';
 import { VideoSettingsColumn } from '@/components/VideoSettingsColumn';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
 
 import {
     VideoSettings,
@@ -347,31 +349,24 @@ const VideoGenerationPage = () => {
             setIsLoading(false);
         }
     };
-
     return (
-        <div className="min-h-screen flex flex-col">
-            {/* Warning Banner */}
-            <div className="bg-yellow-200 text-yellow-900 text-center p-2 font-semibold">
-                ⚠️ This feature is currently under development and may not function as expected.
-            </div>
+        <div className="flex-1 overflow-auto bg-[#0a0a0f]">
 
             {/* Header */}
-            <div className="flex-none p-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="max-w-7xl mx-auto">
-                    <h1 className="text-3xl font-bold flex items-center gap-2">
-                        <VideoIcon className="w-8 h-8" />
-                        Video Generation
-                    </h1>
-                    <p className="text-muted-foreground">
-                        Create AI-generated videos from {settings.generation_type === 'image' ? 'images' : 'text descriptions'}
-                    </p>
-                </div>
+            <div className="p-8">
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent flex items-center gap-2">
+                    <VideoIcon className="w-8 h-8" />
+                    Video Generation
+                </h2>
+                <p className="text-gray-400 mt-2">
+                    Create AI-generated videos from {settings.generation_type === 'image' ? 'images' : 'text descriptions'}
+                </p>
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 p-4">
-                <div className="max-w-7xl mx-auto">
-                    <div className="grid grid-cols-3 gap-4">
+            <div className="p-8 pt-0">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div className="lg:col-span-3">
                         <VideoInputColumn
                             settings={settings}
                             prompt={prompt}
@@ -384,13 +379,18 @@ const VideoGenerationPage = () => {
                             onImageRemove={handleRemoveImage}
                             onSubmit={handleSubmit}
                         />
+                    </div>
 
+                    <div className="lg:col-span-6">
                         <VideoPreviewColumn
                             generatedVideo={videoData?.file?.download_url || null}
                             error={error}
                             generationProgress={generationProgress}
                             prompt={prompt}
                         />
+                    </div>
+
+                    <div className="lg:col-span-3">
                         <VideoSettingsColumn
                             settings={settings}
                             onSettingsChange={setSettings}
@@ -398,7 +398,6 @@ const VideoGenerationPage = () => {
                             isLoading={isLoading}
                             videoUrl={videoData?.file?.download_url}
                         />
-
                     </div>
                 </div>
             </div>
@@ -407,3 +406,4 @@ const VideoGenerationPage = () => {
 };
 
 export default VideoGenerationPage;
+

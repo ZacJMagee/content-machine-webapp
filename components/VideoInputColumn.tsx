@@ -35,10 +35,10 @@ export const VideoInputColumn = ({
 }: VideoInputColumnProps) => {
     return (
         <div className="h-full flex flex-col gap-4">
-            <Card className="flex-1">
+            <Card className="flex-1 border-gray-800/50 bg-black/20 backdrop-blur-sm">
                 <CardHeader>
                     <CardTitle>Video Description</CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-gray-400">
                         Choose your generation method and provide inputs
                     </CardDescription>
                 </CardHeader>
@@ -56,12 +56,12 @@ export const VideoInputColumn = ({
                                     <RadioGroupItem value="image" id="image" className="peer sr-only" />
                                     <Label
                                         htmlFor="image"
-                                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer w-full"
+                                        className="flex flex-col items-center justify-between rounded-md border-2 border-gray-800/50 bg-gray-900/50 p-4 hover:bg-gray-800/50 hover:border-gray-700/50 peer-data-[state=checked]:border-blue-500 [&:has([data-state=checked])]:border-blue-500 cursor-pointer w-full transition-colors"
                                     >
                                         <ImageIcon className="mb-2 h-6 w-6" />
                                         <div className="text-center">
                                             <p className="font-medium">Image to Video</p>
-                                            <p className="text-sm text-muted-foreground">
+                                            <p className="text-sm text-gray-400">
                                                 Start with an image
                                             </p>
                                         </div>
@@ -72,12 +72,12 @@ export const VideoInputColumn = ({
                                     <RadioGroupItem value="text" id="text" className="peer sr-only" />
                                     <Label
                                         htmlFor="text"
-                                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer w-full"
+                                        className="flex flex-col items-center justify-between rounded-md border-2 border-gray-800/50 bg-gray-900/50 p-4 hover:bg-gray-800/50 hover:border-gray-700/50 peer-data-[state=checked]:border-blue-500 [&:has([data-state=checked])]:border-blue-500 cursor-pointer w-full transition-colors"
                                     >
                                         <VideoIcon className="mb-2 h-6 w-6" />
                                         <div className="text-center">
                                             <p className="font-medium">Text to Video</p>
-                                            <p className="text-sm text-muted-foreground">
+                                            <p className="text-sm text-gray-400">
                                                 Start with description
                                             </p>
                                         </div>
@@ -92,7 +92,7 @@ export const VideoInputColumn = ({
                                 <Label>First Frame Image</Label>
                                 <div className="flex flex-col gap-4">
                                     {!firstFramePreview ? (
-                                        <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                                        <div className="border-2 border-dashed border-gray-800/50 rounded-lg p-6 text-center bg-gray-900/20">
                                             <Input
                                                 type="file"
                                                 accept="image/jpeg,image/jpg,image/png"
@@ -104,11 +104,11 @@ export const VideoInputColumn = ({
                                                 htmlFor="image-upload" 
                                                 className="flex flex-col items-center gap-2 cursor-pointer"
                                             >
-                                                <ImageIcon className="w-8 h-8 text-muted-foreground" />
-                                                <div className="text-sm text-muted-foreground">
+                                                <ImageIcon className="w-8 h-8 text-gray-400" />
+                                                <div className="text-sm text-gray-400">
                                                     <span className="font-semibold">Click to upload</span> or drag and drop
                                                 </div>
-                                                <p className="text-xs text-muted-foreground">
+                                                <p className="text-xs text-gray-400">
                                                     JPG, JPEG, or PNG (max. 20MB)
                                                 </p>
                                             </Label>
@@ -148,11 +148,11 @@ export const VideoInputColumn = ({
                                 }
                                 value={prompt}
                                 onChange={(e) => onPromptChange(e.target.value)}
-                                className="h-32 resize-none"
+                                className="h-32 resize-none bg-gray-900/50 border-gray-800/50"
                                 required={settings.generation_type === 'text'}
                             />
                             {settings.generation_type === 'image' && (
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-sm text-gray-400">
                                     If no description is provided, the AI will automatically determine the video progression.
                                 </p>
                             )}
@@ -165,7 +165,7 @@ export const VideoInputColumn = ({
                                 (settings.generation_type === 'image' && !firstFrame) ||
                                 (settings.generation_type === 'text' && !prompt.trim())
                             }
-                            className="w-full"
+                            className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600"
                         >
                             {isLoading ? 'Generating...' : 'Generate Video'}
                         </Button>
@@ -175,3 +175,5 @@ export const VideoInputColumn = ({
         </div>
     );
 };
+
+export default VideoInputColumn;

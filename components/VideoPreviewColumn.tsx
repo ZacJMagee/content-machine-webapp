@@ -114,7 +114,7 @@ export const VideoPreviewColumn = ({
     };
 
     // Rest of your existing render functions remain the same
-    const renderVideoPlayer = () => (
+        const renderVideoPlayer = () => (
         <div className="space-y-4 w-full">
             <div className="relative rounded-lg overflow-hidden bg-slate-100">
                 <video
@@ -234,3 +234,4 @@ export const VideoPreviewColumn = ({
         </div>
     );
 };
+
