@@ -1,100 +1,100 @@
-'use client';
-
+// components/TestVideoPlayer.tsx
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import VideoDownloadButton from './VideoDownloadButton';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
 const TestVideoPlayer = () => {
-    const testVideoUrl = "https://public-cdn-video-data-algeng.oss-cn-wulanchabu.aliyuncs.com/inference_output%2Fvideo%2F2025-01-09%2Fdf4c4d34-fa76-4b90-9bc7-d43d0ee1db1c%2Foutput.mp4?Expires=1736385145&OSSAccessKeyId=LTAI5tAmwsjSaaZVA6cEFAUu&Signature=xELSPU%2F90qKFOrUoWC0ZSlB8C7Q%3D";
-
-    const [videoError, setVideoError] = useState<string | null>(null);
+    const [videoUrl, setVideoUrl] = useState<string>('');
+    const [currentVideo, setCurrentVideo] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const [videoStatus, setVideoStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
-    const handleDownload = async () => {
-        try {
-            const response = await fetch(testVideoUrl, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'video/mp4,video/*;q=0.8,*/*;q=0.5',
-                }
-            });
-            
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `test-video-${Date.now()}.mp4`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            setVideoError(error instanceof Error ? error.message : 'Download failed');
+    const handleLoadVideo = () => {
+        if (!videoUrl.trim()) {
+            setError('Please enter a video URL');
+            return;
         }
+        setCurrentVideo(videoUrl);
+        setError(null);
+    };
+
+    const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+        setVideoStatus('error');
+        const videoElement = e.currentTarget;
+        setError(videoElement.error?.message || 'Video playback failed');
     };
 
     return (
-        <Card className="max-w-2xl mx-auto mt-8">
+        <Card className="max-w-2xl mx-auto">
             <CardHeader>
                 <CardTitle>Video Player Test</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="relative rounded-lg overflow-hidden bg-slate-100 min-h-[240px]">
-                    <video
-                        controls
-                        className="w-full rounded-lg"
-                        src={testVideoUrl}
-                        onError={(e) => {
-                            setVideoStatus('error');
-                            const videoElement = e.currentTarget;
-                            setVideoError(videoElement.error?.message || 'Video playback failed');
-                        }}
-                        onLoadStart={() => {
-                            setVideoStatus('loading');
-                            setVideoError(null);
-                        }}
-                        onLoadedData={() => {
-                            setVideoStatus('ready');
-                        }}
-                    >
-                        <source src={testVideoUrl} type="video/mp4" />
-                        Your browser does not support the video tag.
-                    </video>
+                {/* Video URL Input */}
+                <div className="flex gap-2">
+                    <Input
+                        type="text"
+                        placeholder="Paste video URL here"
+                        value={videoUrl}
+                        onChange={(e) => setVideoUrl(e.target.value)}
+                    />
+                    <Button onClick={handleLoadVideo}>Load Video</Button>
                 </div>
 
-                {videoError && (
+                {/* Video Player */}
+                {currentVideo && (
+                    <div className="space-y-4">
+                        <div className="relative rounded-lg overflow-hidden bg-slate-100">
+                            <video
+                                controls
+                                className="w-full rounded-lg"
+                                playsInline
+                                onError={handleVideoError}
+                                onLoadStart={() => {
+                                    setVideoStatus('loading');
+                                    setError(null);
+                                }}
+                                onLoadedData={() => {
+                                    setVideoStatus('ready');
+                                }}
+                            >
+                                <source src={currentVideo} type="video/mp4" />
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+
+                        {/* Download Button */}
+                        <VideoDownloadButton
+                            videoUrl={currentVideo}
+                            prompt="test-video"
+                            disabled={videoStatus !== 'ready'}
+                            onError={setError}
+                        />
+                    </div>
+                )}
+
+                {/* Error Display */}
+                {error && (
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>{videoError}</AlertDescription>
+                        <AlertDescription>{error}</AlertDescription>
                     </Alert>
                 )}
 
-                <div className="flex gap-3">
-                    <Button
-                        onClick={() => window.open(testVideoUrl, '_blank')}
-                        variant="outline"
-                        disabled={videoStatus === 'error'}
-                    >
-                        Open in New Tab
-                    </Button>
-                    <Button
-                        onClick={handleDownload}
-                        variant="outline"
-                        disabled={videoStatus === 'error'}
-                    >
-                        Download Video
-                    </Button>
-                </div>
-
-                <div className="text-sm text-muted-foreground">
-                    <p>Video Status: {videoStatus}</p>
-                    <p className="break-all mt-2">
-                        <span className="font-medium">Test URL:</span> {testVideoUrl}
-                    </p>
+                {/* Debug Info */}
+                <div className="mt-4 p-4 bg-slate-100 rounded-lg">
+                    <h3 className="font-semibold mb-2">Debug Information</h3>
+                    <pre className="text-xs whitespace-pre-wrap">
+                        {JSON.stringify({
+                            videoUrl: currentVideo,
+                            status: videoStatus,
+                            error: error
+                        }, null, 2)}
+                    </pre>
                 </div>
             </CardContent>
         </Card>

@@ -1,4 +1,5 @@
 // components/VideoInputColumn.tsx
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,6 +8,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 import { ImageIcon, VideoIcon, XIcon } from "lucide-react";
 import { VideoSettings } from "@/types/video-generation";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
+// Define our debug info interface
+interface DebugInfo {
+    timestamp: string;
+    event: string;
+    details: any;
+}
 
 interface VideoInputColumnProps {
     settings: VideoSettings;
@@ -33,6 +42,119 @@ export const VideoInputColumn = ({
     onImageRemove,
     onSubmit
 }: VideoInputColumnProps) => {
+    // Add debug state
+    const [showDebug, setShowDebug] = useState(false);
+    const [debugLog, setDebugLog] = useState<DebugInfo[]>([]);
+
+    // Debug logging helper
+    const addDebugLog = (event: string, details: any) => {
+        const logEntry: DebugInfo = {
+            timestamp: new Date().toISOString(),
+            event,
+            details
+        };
+        setDebugLog(prev => [...prev, logEntry]);
+        console.log(`[${event}]`, details);
+    };
+
+    // Log important state changes
+    useEffect(() => {
+        addDebugLog('Generation Type Changed', {
+            type: settings.generation_type,
+            timestamp: new Date().toISOString()
+        });
+    }, [settings.generation_type]);
+
+    useEffect(() => {
+        if (firstFrame) {
+            addDebugLog('Image Loaded', {
+                name: firstFrame.name,
+                size: firstFrame.size,
+                type: firstFrame.type
+            });
+        }
+    }, [firstFrame]);
+
+    // Enhanced handlers with debug logging
+    const handlePromptChange = (value: string) => {
+        onPromptChange(value);
+        addDebugLog('Prompt Updated', { prompt: value });
+    };
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        addDebugLog('Image Upload Attempted', {
+            files: e.target.files ? Array.from(e.target.files).map(f => ({
+                name: f.name,
+                size: f.size,
+                type: f.type
+            })) : []
+        });
+        onImageUpload(e);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        addDebugLog('Generation Attempted', {
+            prompt,
+            generationType: settings.generation_type,
+            hasImage: !!firstFrame
+        });
+        await onSubmit(e);
+    };
+
+    // Render debug panel
+    const renderDebugPanel = () => (
+        <Card className="mt-4 border-dashed">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Generation Debug Info</CardTitle>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDebugLog([])}
+                >
+                    Clear Log
+                </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {/* Current State */}
+                <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Current State:</h3>
+                    <div className="bg-muted rounded-md p-2">
+                        <pre className="text-xs whitespace-pre-wrap">
+                            {JSON.stringify({
+                                generationType: settings.generation_type,
+                                hasImage: !!firstFrame,
+                                imageDetails: firstFrame ? {
+                                    name: firstFrame.name,
+                                    size: firstFrame.size,
+                                    type: firstFrame.type
+                                } : null,
+                                promptLength: prompt.length,
+                                isLoading
+                            }, null, 2)}
+                        </pre>
+                    </div>
+                </div>
+
+                {/* Event Log */}
+                <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Event Log:</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {debugLog.map((log, index) => (
+                            <div key={index} className="bg-muted rounded-md p-2 text-xs">
+                                <p className="text-muted-foreground">
+                                    [{new Date(log.timestamp).toLocaleTimeString()}] {log.event}
+                                </p>
+                                <pre className="mt-1 whitespace-pre-wrap">
+                                    {JSON.stringify(log.details, null, 2)}
+                                </pre>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+
     return (
         <div className="h-full flex flex-col gap-4">
             <Card className="flex-1">
@@ -43,7 +165,7 @@ export const VideoInputColumn = ({
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={onSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Generation Type Selector */}
                         <div className="space-y-2">
                             <Label>Generation Method</Label>
@@ -96,7 +218,7 @@ export const VideoInputColumn = ({
                                             <Input
                                                 type="file"
                                                 accept="image/jpeg,image/jpg,image/png"
-                                                onChange={onImageUpload}
+                                                onChange={handleImageUpload}
                                                 className="hidden"
                                                 id="image-upload"
                                             />
@@ -147,7 +269,7 @@ export const VideoInputColumn = ({
                                     : "Describe the video you want to generate..."
                                 }
                                 value={prompt}
-                                onChange={(e) => onPromptChange(e.target.value)}
+                                onChange={(e) => handlePromptChange(e.target.value)}
                                 className="h-32 resize-none"
                                 required={settings.generation_type === 'text'}
                             />
@@ -159,16 +281,34 @@ export const VideoInputColumn = ({
                         </div>
 
                         {/* Submit Button */}
-                        <Button
-                            type="submit"
-                            disabled={isLoading ||
-                                (settings.generation_type === 'image' && !firstFrame) ||
-                                (settings.generation_type === 'text' && !prompt.trim())
-                            }
-                            className="w-full"
-                        >
-                            {isLoading ? 'Generating...' : 'Generate Video'}
-                        </Button>
+                        <div className="space-y-4">
+                            <Button
+                                type="submit"
+                                disabled={isLoading ||
+                                    (settings.generation_type === 'image' && !firstFrame) ||
+                                    (settings.generation_type === 'text' && !prompt.trim())
+                                }
+                                className="w-full"
+                            >
+                                {isLoading ? 'Generating...' : 'Generate Video'}
+                            </Button>
+                            
+                            <Collapsible>
+                                <CollapsibleTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="w-full"
+                                        onClick={() => setShowDebug(!showDebug)}
+                                    >
+                                        {showDebug ? 'Hide Debug Info' : 'Show Debug Info'}
+                                    </Button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                    {showDebug && renderDebugPanel()}
+                                </CollapsibleContent>
+                            </Collapsible>
+                        </div>
                     </form>
                 </CardContent>
             </Card>
