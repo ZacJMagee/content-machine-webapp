@@ -49,53 +49,49 @@ export const VideoPreviewColumn = ({
     // Updated download handler using our API route
     const handleDownload = async () => {
         if (!generatedVideo || isDownloading) return;
-        
+
         try {
             setIsDownloading(true);
             setVideoError(null);
-            
-            const fileId = extractFileId(generatedVideo);
-            if (!fileId) {
-                throw new Error('Could not extract file ID from video URL');
-            }
 
             console.log('Starting video download:', {
-                fileId,
+                url: generatedVideo,
                 timestamp: new Date().toISOString()
             });
 
-            // Use our video generation endpoint
-            const response = await fetch(`/api/generate-video?fileId=${fileId}`);
-            
+            // Pass the video URL to the endpoint
+            const encodedUrl = encodeURIComponent(generatedVideo);
+            const response = await fetch(`/api/generate-video?url=${encodedUrl}`);
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => null);
-                throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
+                throw new Error(errorData?.error || `Failed to fetch video: ${response.statusText}`);
             }
-            
+
             const blob = await response.blob();
-            
+
             if (blob.size === 0) {
                 throw new Error('Downloaded file is empty');
             }
 
-            // Create filename
+            // Create filename with timestamp
             const timestamp = new Date().toISOString().split('T')[0];
             const sanitizedPrompt = prompt
-                .split(' ')
-                .slice(0, 5)
-                .join('-')
-                .toLowerCase()
-                .replace(/[^a-z0-9-]/g, '');
-            
+            .split(' ')
+            .slice(0, 5)
+            .join('-')
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, '');
+
             const filename = `${sanitizedPrompt}-${timestamp}.mp4`;
-            
+
             // Create and trigger download
             const downloadUrl = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = downloadUrl;
             a.download = filename;
             document.body.appendChild(a);
-            
+
             console.log('Initiating download:', {
                 filename,
                 size: blob.size,
@@ -103,12 +99,12 @@ export const VideoPreviewColumn = ({
             });
 
             a.click();
-            
+
             // Cleanup
             document.body.removeChild(a);
             URL.revokeObjectURL(downloadUrl);
             console.log('Download completed successfully');
-            
+
         } catch (err) {
             console.error('Download failed:', err);
             setVideoError(err instanceof Error ? err.message : 'Failed to download video');
