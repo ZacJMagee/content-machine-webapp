@@ -5,9 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { AlertCircle, VideoIcon, ExternalLink, Download } from "lucide-react";
 import { GenerationProgress } from "@/types/video-generation";
-import VideoDownloadButton from './VideoDownloadButton';
 
-// Define our component's props interface
 interface VideoPreviewColumnProps {
     generatedVideo: string | null;
     error: string | null;
@@ -15,7 +13,6 @@ interface VideoPreviewColumnProps {
     prompt: string;
 }
 
-// Define the possible states for our video player
 type VideoPlayerStatus = 'loading' | 'ready' | 'error';
 
 export const VideoPreviewColumn = ({
@@ -24,12 +21,10 @@ export const VideoPreviewColumn = ({
     generationProgress,
     prompt
 }: VideoPreviewColumnProps) => {
-    // State management for video player
     const [videoError, setVideoError] = useState<string | null>(null);
     const [videoStatus, setVideoStatus] = useState<VideoPlayerStatus>('loading');
     const [isDownloading, setIsDownloading] = useState(false);
 
-    // Log when we receive a new video URL for debugging purposes
     useEffect(() => {
         if (generatedVideo) {
             console.log('Video URL received:', {
@@ -39,31 +34,51 @@ export const VideoPreviewColumn = ({
         }
     }, [generatedVideo]);
 
-    // Handle video download functionality
+    // Extract fileId from the video URL
+    const extractFileId = (url: string): string | null => {
+        try {
+            const decodedUrl = decodeURIComponent(url);
+            const match = decodedUrl.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+            return match ? match[1] : null;
+        } catch (err) {
+            console.error('Error extracting file ID:', err);
+            return null;
+        }
+    };
+
+    // Updated download handler using our API route
     const handleDownload = async () => {
         if (!generatedVideo || isDownloading) return;
         
         try {
             setIsDownloading(true);
-            console.log('Starting video download...', {
-                url: generatedVideo,
+            setVideoError(null);
+            
+            const fileId = extractFileId(generatedVideo);
+            if (!fileId) {
+                throw new Error('Could not extract file ID from video URL');
+            }
+
+            console.log('Starting video download:', {
+                fileId,
                 timestamp: new Date().toISOString()
             });
-            
-            const response = await fetch(generatedVideo, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'video/mp4,video/*;q=0.8,*/*;q=0.5',
-                }
-            });
+
+            // Use our video generation endpoint
+            const response = await fetch(`/api/generate-video?fileId=${fileId}`);
             
             if (!response.ok) {
-                throw new Error(`Download failed with status: ${response.status}`);
+                const errorData = await response.json().catch(() => null);
+                throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
             }
             
             const blob = await response.blob();
             
-            // Create a meaningful filename using the prompt and timestamp
+            if (blob.size === 0) {
+                throw new Error('Downloaded file is empty');
+            }
+
+            // Create filename
             const timestamp = new Date().toISOString().split('T')[0];
             const sanitizedPrompt = prompt
                 .split(' ')
@@ -71,37 +86,38 @@ export const VideoPreviewColumn = ({
                 .join('-')
                 .toLowerCase()
                 .replace(/[^a-z0-9-]/g, '');
+            
             const filename = `${sanitizedPrompt}-${timestamp}.mp4`;
             
             // Create and trigger download
-            const url = URL.createObjectURL(blob);
+            const downloadUrl = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
+            a.href = downloadUrl;
             a.download = filename;
             document.body.appendChild(a);
             
-            console.log('Downloading video:', {
+            console.log('Initiating download:', {
                 filename,
                 size: blob.size,
                 type: blob.type
             });
-            
+
             a.click();
             
             // Cleanup
             document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
+            URL.revokeObjectURL(downloadUrl);
             console.log('Download completed successfully');
-        } catch (error) {
-            console.error('Download failed:', error);
-            setVideoError(error instanceof Error ? error.message : 'Download failed');
+            
+        } catch (err) {
+            console.error('Download failed:', err);
+            setVideoError(err instanceof Error ? err.message : 'Failed to download video');
         } finally {
             setIsDownloading(false);
         }
     };
 
-    // Render the video player section
+    // Rest of your existing render functions remain the same
     const renderVideoPlayer = () => (
         <div className="space-y-4 w-full">
             <div className="relative rounded-lg overflow-hidden bg-slate-100">
@@ -127,7 +143,6 @@ export const VideoPreviewColumn = ({
                 </video>
             </div>
             
-            {/* Video control buttons */}
             <div className="flex gap-3">
                 <Button
                     onClick={() => window.open(generatedVideo!, '_blank')}
@@ -151,7 +166,6 @@ export const VideoPreviewColumn = ({
         </div>
     );
 
-    // Render the placeholder when no video is available
     const renderPlaceholder = () => (
         <div className="text-center text-muted-foreground">
             <VideoIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -159,7 +173,6 @@ export const VideoPreviewColumn = ({
         </div>
     );
 
-    // Render error and progress information
     const renderErrorAndProgress = () => {
         const currentError = externalError || videoError;
         
@@ -220,7 +233,6 @@ export const VideoPreviewColumn = ({
                 </CardContent>
             </Card>
 
-            {/* Show errors and progress information if necessary */}
             {(externalError || videoError || generationProgress.status !== 'idle') && 
                 renderErrorAndProgress()}
         </div>

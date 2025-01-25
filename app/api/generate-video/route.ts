@@ -1,4 +1,5 @@
 // app/api/generate-video/route.ts
+//
 import { NextResponse } from 'next/server';
 
 // Handle GET requests for video downloads
