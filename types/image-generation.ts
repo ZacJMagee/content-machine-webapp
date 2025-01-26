@@ -1,71 +1,83 @@
-// types/image-generation.ts
+// File: types/image-generation.ts
 
-export interface ImageSettings {
-  aspect_ratio: string;
-  width?: number;
-  height?: number;
-  prompt_strength: number;
-  model: 'dev' | 'schnell';
-  num_outputs: number;
-  num_inference_steps: number;
-  guidance_scale: number;
+// 1. Basic Types and Enums
+export type ImageSize = 
+  | 'square_hd' 
+  | 'square' 
+  | 'portrait_4_3' 
+  | 'portrait_16_9' 
+  | 'landscape_4_3' 
+  | 'landscape_16_9' 
+  | { width: number; height: number };
+
+export type QueueStatus = 'IN_QUEUE' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+
+// 2. Input-related Interfaces
+export interface LoraWeight {
+  path: string;   // URL or path to the LoRA weights
+  scale: number;  // Default: 1
+}
+
+export interface GenerationInput {
+  prompt: string;
+  image_size?: ImageSize;            // Default: landscape_4_3
+  num_inference_steps?: number;      // Default: 28
   seed?: number;
-  output_format: 'webp' | 'jpg' | 'png';
-  output_quality: number;
-  go_fast: boolean;
-  megapixels: '1' | '0.25';
-  lora_scale: number;
-  extra_lora?: string;
-  extra_lora_scale: number;
-}
-// Add the GenerationProgress interface
-export interface GenerationProgress {
-    status: 'starting' | 'succeeded' | 'failed';
-    logs: string;
-    started_at: string;
-    completed_at?: string;
-    metrics?: {
-        predict_time: number;
-    };
+  loras?: LoraWeight[];             // Default: []
+  guidance_scale?: number;          // Default: 3.5
+  num_images?: number;              // Default: 1
+  enable_safety_checker?: boolean;  // Default: true
+  output_format?: 'jpeg' | 'png';   // Default: jpeg
 }
 
-// Also add this interface if it's not already in your types/api.ts
+// 3. Output and Response Interfaces
+export interface GeneratedImage {
+  url: string;
+  content_type: string;  // e.g., "image/jpeg"
+  width?: number;        // Optional for custom sizes
+  height?: number;       // Optional for custom sizes
+}
+
 export interface GenerationResponse {
-    success: boolean;
-    output?: string;
-    error?: string;
-    logs?: string;
-    metrics?: {
-        predict_time: number;
-    };
+  images: GeneratedImage[];
+  prompt: string;
+  seed?: number;
+  has_nsfw_concepts?: boolean[];
+  timings?: Record<string, number>;
 }
 
+// 4. Queue-related Interfaces
+export interface QueueResponse {
+  request_id: string;
+}
 
-export const DEFAULT_IMAGE_SETTINGS: ImageSettings = {
-  aspect_ratio: '1:1',
-  prompt_strength: 0.8,
-  model: 'dev',
-  num_outputs: 1,
-  num_inference_steps: 28,
-  guidance_scale: 3,
-  output_format: 'webp',
-  output_quality: 80,
-  go_fast: false,
-  megapixels: '1',
-  lora_scale: 1,
-  extra_lora_scale: 1
-};
+export interface LogMessage {
+  message: string;
+}
 
-// Prompt suggestions for different styles
-export const PROMPT_SUGGESTIONS = [
-  'Cinematic',
-  'Photorealistic',
-  'Digital Art',
-  'Oil Painting',
-  'Watercolor',
-  'Pencil Sketch',
-  'Anime Style',
-  'Comic Book',
-  'Low Poly',
-  'Pixel Art'
-];
+export interface QueueStatusResponse {
+  status: QueueStatus;
+  logs?: LogMessage[];
+  error?: string;
+  output?: {
+    error?: string;
+    images?: GeneratedImage[];
+    seed?: number;
+  };
+}
+
+// 5. UI-specific Interfaces (for client-side use)
+export interface LogEntry {
+  timestamp: string;
+  message: string;
+  type: 'info' | 'progress' | 'success' | 'error';
+}
+
+// 6. API Response Types
+export interface StatusResponseBody {
+  status: string;
+  progress: number;
+  logs?: string[];
+  error?: string;
+  result?: GenerationResponse;
+}

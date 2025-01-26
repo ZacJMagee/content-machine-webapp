@@ -15,34 +15,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import GenerationLogs, { LogEntry } from '@/components/GenerationLogs';
 import { fal } from "@fal-ai/client";
 
-import {
-    FluxLoraInput,
+import { 
+    FluxLoraInput, 
     FluxLoraOutput,
     QueueStatusUpdate,
-    ImageSettings
+    ImageSettings 
 } from '@/types/image-generation';
 
-type QueueStatus = 'IN_QUEUE' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-interface LogMessage {
-    message: string;
-}
-
-interface QueueStatusResponse {
-    status: QueueStatus;
-    logs?: LogMessage[];
-    output?: any;
-}
-
-interface QueueUpdate {
-    status: QueueStatus;
-    logs?: Array<{
-        message: string;
-    }>;
-    error?: string;
-    output?: {
-        error?: string;
-    };
-}
 // Keep your existing interface
 interface GenerationProgress {
     status: 'starting' | 'succeeded' | 'failed';
@@ -56,8 +35,8 @@ interface GenerationProgress {
 
 // Define the endpoint type for fal-ai/flux-lora
 export interface FluxLoraEndpoint {
-    input: FluxLoraInput;
-    output: FluxLoraOutput;  // Note: Changed from 'response' to 'output'
+  input: FluxLoraInput;
+  output: FluxLoraOutput;  // Note: Changed from 'response' to 'output'
 }
 
 function ImageGenerationPage() {
@@ -92,14 +71,16 @@ function ImageGenerationPage() {
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
+        // Prevent the default form submission behavior
         e.preventDefault();
 
+        // Validate that we have a prompt before proceeding
         if (!prompt.trim()) {
             setError('Please provide a description for the image');
             return;
         }
 
-        // Reset states
+        // Initialize the UI state for a new generation attempt
         setIsLoading(true);
         setError(null);
         setGeneratedImage(null);
@@ -108,102 +89,137 @@ function ImageGenerationPage() {
         setStatus('STARTING');
 
         try {
-            addLog('Starting image generation...', 'info');
-
-            // Step 1: Submit the generation request
-            const response = await fetch('/api/generate-image', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+            // Prepare the input parameters for image generation
+            const generationParams = {
+                input: {
                     prompt: prompt.trim(),
-                    image_size: 'landscape_4_3',
-                    num_inference_steps: 28,
-                    guidance_scale: 3.5,
-                    num_images: 1,
-                    enable_safety_checker: true,
-                    output_format: 'jpeg',
-                    sync_mode: false // Important: we're using queue mode
-                })
-            });
+                    image_size: settings.image_size || 'landscape_4_3',
+                    num_inference_steps: settings.num_inference_steps || 28,
+                    guidance_scale: settings.guidance_scale || 3.5,
+                    output_format: settings.output_format || 'jpeg',
+                    num_images: settings.num_images || 1,
+                    enable_safety_checker: settings.enable_safety_checker ?? true,
+                    seed: settings.seed,
+                    loras: settings.loras || []
+                },
+                logs: true,
+                onQueueUpdate: (queueStatus: QueueStatusUpdate) => {
+                    // Update the generation status
+                    setStatus(queueStatus.status);
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Failed to submit generation request');
-            }
+                    // Handle different queue states
+                    switch (queueStatus.status) {
+                        case 'IN_QUEUE':
+                            setProgress(10);
+                            addLog('Request queued and waiting to start...', 'info');
+                            break;
 
-            const { request_id }: QueueResponse = await response.json();
+                        case 'IN_PROGRESS':
+                            setProgress(50);
+                            addLog('Generating your image...', 'progress');
 
-            if (!request_id) {
-                throw new Error('No request ID received');
-            }
+                            // Handle progress logs if available
+                            if (queueStatus.logs) {
+                                queueStatus.logs.forEach(log => {
+                                    addLog(log.message, 'progress');
+                                });
+                            }
+                            break;
 
-            addLog('Request submitted successfully', 'info');
+                        case 'COMPLETED':
+                            setProgress(100);
+                            addLog('Generation completed successfully!', 'success');
+                            break;
 
-            // Step 2: Poll for status updates
-            let completed = false;
-            while (!completed) {
-                // Wait 1 second between polls
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                        case 'FAILED':
+                            setProgress(0);
+                            // Construct a detailed error message
+                            const errorDetails = {
+                                statusError: queueStatus.error,
+                                outputError: queueStatus.output?.error,
+                                timestamp: new Date().toLocaleTimeString()
+                            };
 
-                const statusResponse = await fetch(`/api/generate-image/status?requestId=${request_id}`);
-                if (!statusResponse.ok) {
-                    throw new Error('Failed to check generation status');
-                }
+                            // Log the complete error for debugging
+                            console.error('Generation failed:', errorDetails);
 
-                const statusData = await statusResponse.json();
+                            // Create a user-friendly error message
+                            const errorMessage = queueStatus.error || 
+                                queueStatus.output?.error || 
+                                'An error occurred during image generation';
 
-                // Update UI based on status
-                setStatus(statusData.status);
-                setProgress(statusData.progress);
-
-                // Handle logs if any
-                if (statusData.logs) {
-                    statusData.logs.forEach((message: string) => {
-                        addLog(message, 'progress');
-                    });
-                }
-
-                // Check if the generation is complete
-                if (statusData.status === 'completed' && statusData.result) {
-                    completed = true;
-                    const result = statusData.result as GenerationResponse;
-
-                    if (!result.images?.[0]?.url) {
-                        throw new Error('No image URL in completed result');
-                    }
-
-                    setGeneratedImage(result.images[0].url);
-                    addLog('Image generated successfully!', 'success');
-
-                    if (result.seed) {
-                        addLog(`Generation seed: ${result.seed}`, 'info');
+                            addLog(`Generation failed: ${errorMessage}`, 'error');
+                            setError(errorMessage);
+                            break;
                     }
                 }
+            };
 
-                // Check for failure
-                if (statusData.status === 'failed') {
-                    throw new Error(statusData.error || 'Generation failed');
-                }
+            // Call the fal.ai API
+            const result = await fal.subscribe(
+                "fal-ai/flux-lora",
+                generationParams
+            );
+
+            // Validate the API response
+            if (!result) {
+                throw new Error('No response received from the API');
+            }
+
+            // Check if we have image data
+            if (!result.data?.images?.[0]) {
+                throw new Error('No image data received from the API');
+            }
+
+            // Update UI with the generated image
+            const generatedImageUrl = result.data.images[0].url;
+            setGeneratedImage(generatedImageUrl);
+            addLog('Image generated successfully!', 'success');
+
+            // Log additional metadata if available
+            if (result.data.seed) {
+                addLog(`Generation seed: ${result.data.seed}`, 'info');
+            }
+
+            if (result.data.timings) {
+                const { started_at, completed_at } = result.data.timings;
+                const duration = new Date(completed_at).getTime() - new Date(started_at).getTime();
+                addLog(`Generation time: ${duration}ms`, 'info');
             }
 
         } catch (error) {
-            console.error('Generation error:', error);
+            // Handle any errors that occurred during the process
+            let errorMessage: string;
 
-            const errorMessage = error instanceof Error
-                ? error.message
-                : 'An unexpected error occurred';
+            if (error instanceof Error) {
+                // Log the complete error object for debugging
+                console.error('Generation error:', {
+                    message: error.message,
+                    cause: error.cause,
+                    stack: error.stack
+                });
 
+                // Create a detailed error message
+                errorMessage = `Error: ${error.message}${
+error.cause ? ` (Cause: ${error.cause})` : ''
+}`;
+            } else {
+                // Handle non-Error objects
+                console.error('Unknown error type:', error);
+                errorMessage = 'An unexpected error occurred during image generation';
+            }
+
+            // Update UI with error information
             setError(errorMessage);
-            addLog(errorMessage, 'error');
-            setStatus('FAILED');
+            addLog(`Error: ${errorMessage}`, 'error');
             setProgress(0);
 
         } finally {
+            // Clean up regardless of success or failure
             setIsLoading(false);
         }
     };
+
 
 
     return (
@@ -302,7 +318,7 @@ function ImageGenerationPage() {
                         )}
 
                         {/* Generation Logs Component */}
-                        <GenerationLogs
+                        <GenerationLogs 
                             logs={logs}
                             status={status}
                             progress={progress}

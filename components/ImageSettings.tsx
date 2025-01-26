@@ -5,22 +5,49 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Settings2, Info, ChevronDown, ChevronUp } from "lucide-react";
-import type { ImageSettings } from '@/types/image-generation';
+import { Settings2, Info, ChevronDown, ChevronUp, Plus, X } from "lucide-react";
+import { ImageSettings, LoraWeight, ImageSize, ImageSizePreset } from '@/types/image-generation';
+import { IMAGE_SIZE_PRESETS, OUTPUT_FORMATS } from '@/constants/image-generation';
 
-interface ImageSettingsProps {
+interface ImageSettingsComponentProps {
   settings: ImageSettings;
   onSettingsChange: (newSettings: ImageSettings) => void;
 }
 
-const ImageSettingsComponent = ({ settings, onSettingsChange }: ImageSettingsProps) => {
+const ImageSettingsComponent = ({ settings, onSettingsChange }: ImageSettingsComponentProps) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [customSize, setCustomSize] = useState(false);
 
-  const updateSetting = <K extends keyof ImageSettings>(key: K, value: ImageSettings[K]) => {
+  // Helper function to update a single setting
+  const updateSetting = <K extends keyof ImageSettings>(
+    key: K,
+    value: ImageSettings[K]
+  ) => {
     onSettingsChange({ ...settings, [key]: value });
   };
 
+  // Helper function to add a new LoRA
+  const addLora = () => {
+    const newLoras = [...settings.loras, { path: '', scale: 1 }];
+    updateSetting('loras', newLoras);
+  };
+
+  // Helper function to update a LoRA
+  const updateLora = (index: number, field: keyof LoraWeight, value: string | number) => {
+    const newLoras = [...settings.loras];
+    newLoras[index] = { ...newLoras[index], [field]: value };
+    updateSetting('loras', newLoras);
+  };
+
+  // Helper function to remove a LoRA
+  const removeLora = (index: number) => {
+    const newLoras = settings.loras.filter((_, i) => i !== index);
+    updateSetting('loras', newLoras);
+  };
+
+  // Component for setting labels with tooltips
   const SettingLabel = ({ label, tooltip }: { label: string; tooltip: string }) => (
     <div className="flex items-center gap-2">
       <Label className="text-sm font-medium">{label}</Label>
@@ -37,6 +64,7 @@ const ImageSettingsComponent = ({ settings, onSettingsChange }: ImageSettingsPro
     </div>
   );
 
+  // Section wrapper component
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className="space-y-4">
       <h3 className="font-semibold text-sm">{title}</h3>
@@ -48,124 +76,140 @@ const ImageSettingsComponent = ({ settings, onSettingsChange }: ImageSettingsPro
     <div className="space-y-6">
       {/* Basic Settings */}
       <Section title="Basic Settings">
-        {/* Aspect Ratio */}
+        {/* Image Size Selection */}
         <div className="space-y-2">
-          <SettingLabel 
-            label="Aspect Ratio" 
-            tooltip="The width-to-height ratio of the generated image"
+          <SettingLabel
+            label="Image Size"
+            tooltip="Choose from preset sizes or specify custom dimensions"
+          />
+          <div className="space-y-4">
+            <Select
+              value={customSize ? 'custom' : (settings.image_size as ImageSizePreset)}
+              onValueChange={(value) => {
+                if (value === 'custom') {
+                  setCustomSize(true);
+                  updateSetting('image_size', { width: 512, height: 512 });
+                } else {
+                  setCustomSize(false);
+                  updateSetting('image_size', value as ImageSizePreset);
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(IMAGE_SIZE_PRESETS).map(([value, { label }]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+                <SelectItem value="custom">Custom Size</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {customSize && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Width (px)</Label>
+                  <Input
+                    type="number"
+                    min={256}
+                    max={1024}
+                    step={64}
+                    value={(settings.image_size as { width: number }).width}
+                    onChange={(e) => {
+                      const width = Math.min(1024, Math.max(256, parseInt(e.target.value)));
+                      updateSetting('image_size', {
+                        ...(settings.image_size as { width: number; height: number }),
+                        width
+                      });
+                    }}
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Height (px)</Label>
+                  <Input
+                    type="number"
+                    min={256}
+                    max={1024}
+                    step={64}
+                    value={(settings.image_size as { height: number }).height}
+                    onChange={(e) => {
+                      const height = Math.min(1024, Math.max(256, parseInt(e.target.value)));
+                      updateSetting('image_size', {
+                        ...(settings.image_size as { width: number; height: number }),
+                        height
+                      });
+                    }}
+                    className="h-8"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Output Format */}
+        <div className="space-y-2">
+          <SettingLabel
+            label="Output Format"
+            tooltip="Choose the image output format"
           />
           <Select
-            value={settings.aspect_ratio}
-            onValueChange={(value) => {
-              updateSetting('aspect_ratio', value);
-              if (value === 'custom') {
-                updateSetting('go_fast', false);
-              }
-            }}
+            value={settings.output_format}
+            onValueChange={(value) => updateSetting('output_format', value as 'jpeg' | 'png')}
           >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1:1">Square (1:1)</SelectItem>
-              <SelectItem value="16:9">Widescreen (16:9)</SelectItem>
-              <SelectItem value="3:2">Standard (3:2)</SelectItem>
-              <SelectItem value="4:3">Classic (4:3)</SelectItem>
-              <SelectItem value="custom">Custom Size</SelectItem>
+              {OUTPUT_FORMATS.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>{label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
-
-          {settings.aspect_ratio === 'custom' && (
-            <div className="grid grid-cols-2 gap-4 mt-2">
-              <div className="space-y-2">
-                <Label className="text-xs">Width (px)</Label>
-                <Input
-                  type="number"
-                  min={256}
-                  max={1440}
-                  step={16}
-                  value={settings.width || 512}
-                  onChange={(e) => updateSetting('width', Math.min(1440, Math.max(256, parseInt(e.target.value))))}
-                  className="h-8"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Height (px)</Label>
-                <Input
-                  type="number"
-                  min={256}
-                  max={1440}
-                  step={16}
-                  value={settings.height || 512}
-                  onChange={(e) => updateSetting('height', Math.min(1440, Math.max(256, parseInt(e.target.value))))}
-                  className="h-8"
-                />
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Quality Settings */}
-        <div className="space-y-4">
-          {/* Output Format */}
-          <div className="space-y-2">
-            <SettingLabel 
-              label="Output Format" 
-              tooltip="The file format for the generated image"
-            />
-            <Select
-              value={settings.output_format}
-              onValueChange={(value) => updateSetting('output_format', value as 'webp' | 'png' | 'jpg')}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="webp">WebP (Recommended)</SelectItem>
-                <SelectItem value="png">PNG (Lossless)</SelectItem>
-                <SelectItem value="jpg">JPG (Smaller size)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Number of Images */}
+        <div className="space-y-2">
+          <SettingLabel
+            label="Number of Images"
+            tooltip="Generate multiple variations at once"
+          />
+          <Select
+            value={settings.num_images.toString()}
+            onValueChange={(value) => updateSetting('num_images', parseInt(value))}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[1, 2, 3, 4].map(num => (
+                <SelectItem key={num} value={num.toString()}>
+                  {num} {num === 1 ? 'Image' : 'Images'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-          {/* Output Quality */}
-          <div className="space-y-2">
-            <SettingLabel 
-              label={`Output Quality (${settings.output_quality})`}
-              tooltip="Higher values give better quality but larger file sizes"
+        {/* Sync Mode Toggle */}
+        <div className="flex items-center justify-between py-2">
+          <div className="space-y-1">
+            <SettingLabel
+              label="Synchronous Generation"
+              tooltip="Wait for immediate results vs. queue for processing"
             />
-            <Slider
-              value={[settings.output_quality]}
-              min={1}
-              max={100}
-              step={1}
-              onValueChange={([value]) => updateSetting('output_quality', value)}
-              className="py-3"
-            />
+            <p className="text-xs text-muted-foreground">
+              Immediate results but may be slower to start
+            </p>
           </div>
-
-          {/* Number of Outputs */}
-          <div className="space-y-2">
-            <SettingLabel 
-              label="Number of Images" 
-              tooltip="Generate multiple variations at once"
-            />
-            <Select
-              value={settings.num_outputs.toString()}
-              onValueChange={(value) => updateSetting('num_outputs', parseInt(value))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[1, 2, 3, 4].map(num => (
-                  <SelectItem key={num} value={num.toString()}>
-                    {num} {num === 1 ? 'Image' : 'Images'}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Switch
+            checked={settings.sync_mode}
+            onCheckedChange={(checked) => updateSetting('sync_mode', checked)}
+          />
         </div>
       </Section>
 
@@ -188,77 +232,18 @@ const ImageSettingsComponent = ({ settings, onSettingsChange }: ImageSettingsPro
       {showAdvanced && (
         <Section title="Advanced Settings">
           <div className="space-y-6">
-            {/* Model Settings */}
-            <div className="space-y-4">
-              {/* Model Selection */}
-              <div className="space-y-2">
-                <SettingLabel 
-                  label="Model"
-                  tooltip="Choose between quality and speed"
-                />
-                <Select
-                  value={settings.model}
-                  onValueChange={(value) => updateSetting('model', value as 'dev' | 'schnell')}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dev">Dev (Better Quality)</SelectItem>
-                    <SelectItem value="schnell">Schnell (Faster)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Resolution */}
-              <div className="space-y-2">
-                <SettingLabel 
-                  label="Resolution"
-                  tooltip="Higher resolution gives more detailed images"
-                />
-                <Select
-                  value={settings.megapixels}
-                  onValueChange={(value) => updateSetting('megapixels', value as '1' | '0.25')}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Standard (1MP)</SelectItem>
-                    <SelectItem value="0.25">Low (0.25MP)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
             {/* Generation Settings */}
             <div className="space-y-4">
-              {/* Prompt Strength */}
-              <div className="space-y-2">
-                <SettingLabel 
-                  label={`Prompt Strength (${settings.prompt_strength.toFixed(2)})`}
-                  tooltip="How strongly to follow the prompt description"
-                />
-                <Slider
-                  value={[settings.prompt_strength]}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  onValueChange={([value]) => updateSetting('prompt_strength', value)}
-                  className="py-3"
-                />
-              </div>
-
               {/* Guidance Scale */}
               <div className="space-y-2">
-                <SettingLabel 
+                <SettingLabel
                   label={`Guidance Scale (${settings.guidance_scale.toFixed(1)})`}
-                  tooltip="Lower values (2-3.5) give more realistic images"
+                  tooltip="How closely to follow the prompt. Higher values = more literal interpretation"
                 />
                 <Slider
                   value={[settings.guidance_scale]}
                   min={1}
-                  max={10}
+                  max={20}
                   step={0.1}
                   onValueChange={([value]) => updateSetting('guidance_scale', value)}
                   className="py-3"
@@ -267,9 +252,9 @@ const ImageSettingsComponent = ({ settings, onSettingsChange }: ImageSettingsPro
 
               {/* Inference Steps */}
               <div className="space-y-2">
-                <SettingLabel 
+                <SettingLabel
                   label={`Inference Steps (${settings.num_inference_steps})`}
-                  tooltip="More steps can give more detailed images"
+                  tooltip="More steps = higher quality but slower generation"
                 />
                 <Slider
                   value={[settings.num_inference_steps]}
@@ -281,87 +266,98 @@ const ImageSettingsComponent = ({ settings, onSettingsChange }: ImageSettingsPro
                 />
               </div>
 
-              {/* Fast Generation */}
+              {/* Seed */}
+              <div className="space-y-2">
+                <SettingLabel
+                  label="Seed"
+                  tooltip="Set for reproducible results (optional)"
+                />
+                <Input
+                  type="number"
+                  value={settings.seed || ''}
+                  onChange={(e) => updateSetting('seed', e.target.value ? parseInt(e.target.value) : undefined)}
+                  placeholder="Random seed (optional)"
+                  className="h-8"
+                />
+              </div>
+
+              {/* Safety Checker */}
               <div className="flex items-center justify-between py-2">
                 <div className="space-y-1">
-                  <SettingLabel 
-                    label="Fast Generation"
-                    tooltip="Optimize for speed over quality"
+                  <SettingLabel
+                    label="Safety Checker"
+                    tooltip="Filter potentially inappropriate content"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Faster generation, lower quality
+                    Helps prevent inappropriate content generation
                   </p>
                 </div>
                 <Switch
-                  checked={settings.go_fast}
-                  disabled={settings.aspect_ratio === 'custom'}
-                  onCheckedChange={(checked) => updateSetting('go_fast', checked)}
+                  checked={settings.enable_safety_checker}
+                  onCheckedChange={(checked) => updateSetting('enable_safety_checker', checked)}
                 />
               </div>
             </div>
 
             {/* LoRA Settings */}
             <div className="space-y-4">
-              {/* Main LoRA Scale */}
-              <div className="space-y-2">
-                <SettingLabel 
-                  label={`LoRA Scale (${settings.lora_scale.toFixed(2)})`}
-                  tooltip="Strength of the main LoRA effect"
+              <div className="flex items-center justify-between">
+                <SettingLabel
+                  label="LoRA Weights"
+                  tooltip="Add custom LoRA models to influence the generation"
                 />
-                <Slider
-                  value={[settings.lora_scale]}
-                  min={-1}
-                  max={3}
-                  step={0.1}
-                  onValueChange={([value]) => updateSetting('lora_scale', value)}
-                  className="py-3"
-                />
-              </div>
-
-              {/* Extra LoRA */}
-              <div className="space-y-2">
-                <SettingLabel 
-                  label="Extra LoRA"
-                  tooltip="Additional LoRA identifier or URL"
-                />
-                <Input
-                  value={settings.extra_lora || ''}
-                  onChange={(e) => updateSetting('extra_lora', e.target.value)}
-                  placeholder="e.g., fofr/flux-pixar-cars"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addLora}
                   className="h-8"
-                />
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add LoRA
+                </Button>
               </div>
 
-              {/* Extra LoRA Scale */}
-              <div className="space-y-2">
-                <SettingLabel 
-                  label={`Extra LoRA Scale (${settings.extra_lora_scale.toFixed(2)})`}
-                  tooltip="Strength of the extra LoRA effect"
-                />
-                <Slider
-                  value={[settings.extra_lora_scale]}
-                  min={-1}
-                  max={3}
-                  step={0.1}
-                  onValueChange={([value]) => updateSetting('extra_lora_scale', value)}
-                  className="py-3"
-                />
-              </div>
-            </div>
+              {settings.loras.map((lora, index) => (
+                <Card key={index} className="p-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium">LoRA {index + 1}</h4>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeLora(index)}
+                        className="h-8"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
 
-            {/* Seed */}
-            <div className="space-y-2">
-              <SettingLabel 
-                label="Seed"
-                tooltip="Set for reproducible results (optional)"
-              />
-              <Input
-                type="number"
-                value={settings.seed || ''}
-                onChange={(e) => updateSetting('seed', e.target.value ? parseInt(e.target.value) : undefined)}
-                placeholder="Random seed (optional)"
-                className="h-8"
-              />
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Path or URL</Label>
+                        <Input
+                          value={lora.path}
+                          onChange={(e) => updateLora(index, 'path', e.target.value)}
+                          placeholder="e.g., path/to/lora or https://..."
+                          className="h-8"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">{`Scale (${lora.scale.toFixed(2)})`}</Label>
+                        <Slider
+                          value={[lora.scale]}
+                          min={0}
+                          max={2}
+                          step={0.01}
+                          onValueChange={([value]) => updateLora(index, 'scale', value)}
+                          className="py-3"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
             </div>
           </div>
         </Section>

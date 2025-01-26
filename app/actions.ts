@@ -7,6 +7,32 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Replicate from "replicate";
 import { ImageSettings } from '@/constants/image-generation';
+import { fal } from "@fal-ai/client";
+import {  FalAPIInput } from '../types/image-generation';
+
+// Configure fal client
+fal.config({
+  credentials: process.env.FAL_KEY as string
+});
+
+// Utility function for consistent logging
+function logStep(step: string, data: any) {
+  console.log(`[Image Generation ${step}]`, JSON.stringify(data, null, 2));
+}
+// Import or redefine the shared types
+type QueueStatus = 'IN_QUEUE' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+
+interface LogMessage {
+  message: string;
+}
+
+interface QueueStatusResponse {
+  status: QueueStatus;
+  logs?: LogMessage[];
+  output?: any;
+}
+
+
 
 
 // Authentication Actions
@@ -180,87 +206,123 @@ async function waitForPrediction(replicate: Replicate, prediction: any, maxAttem
 
   throw new Error('Prediction timed out');
 }
-
 export async function generateImage(data: {
   prompt: string;
 } & ImageSettings) {
   try {
-    console.log('Starting image generation with data:', {
+    // Log initial input data
+    logStep('Input', {
       prompt: data.prompt,
       settings: {
-        go_fast: data.go_fast,
-        aspect_ratio: data.aspect_ratio,
-        output_format: data.output_format,
+        image_size: data.image_size,
         guidance_scale: data.guidance_scale,
-        output_quality: data.output_quality,
-        prompt_strength: data.prompt_strength
+        output_format: data.output_format,
+        num_inference_steps: data.num_inference_steps
       }
     });
 
-    // Initialize Replicate
-    console.log('Initializing Replicate...');
-    const replicate = new Replicate({
-      auth: process.env.REPLICATE_API_KEY,
-    });
-    console.log('Replicate initialized successfully');
+    // Prepare API input
+    const apiInput: FalAPIInput = {
+      prompt: data.prompt,
+      image_size: data.image_size || 'landscape_4_3',
+      num_inference_steps: data.num_inference_steps || 28,
+      guidance_scale: data.guidance_scale || 3.5,
+      output_format: data.output_format || 'jpeg',
+      num_images: 1,
+      enable_safety_checker: true
+    };
 
-    // Create the prediction
-    console.log('Creating prediction...');
-    const prediction = await replicate.predictions.create({
-      version: "3ef4fcf9b99f9aead7b341f010518a9f68383f9a24eea24dcabb2b29ac7b7da0",
-      input: {
-        prompt: data.prompt,
-        model: "dev",
-        go_fast: data.go_fast ?? false,
-        lora_scale: 1,
-        megapixels: "1",
-        num_outputs: 1,
-        aspect_ratio: data.aspect_ratio ?? "1:1",
-        output_format: data.output_format ?? "webp",
-        guidance_scale: data.guidance_scale ?? 3,
-        output_quality: data.output_quality ?? 80,
-        prompt_strength: data.prompt_strength ?? 0.8,
-        extra_lora_scale: 1,
-        num_inference_steps: 28
+    logStep('API Input Prepared', apiInput);
+
+    // Make the API call with typed queue update handler
+    const result = await fal.subscribe("fal-ai/flux-lora", {
+      input: apiInput,
+      logs: true,
+      onQueueUpdate: (status: QueueStatusResponse) => {
+        // Log each queue status update with proper typing
+        logStep('Queue Update', {
+          status: status.status,
+          hasLogs: !!status.logs,
+          timestamp: new Date().toISOString()
+        });
+
+        // Calculate progress based on status (matching status route logic)
+        let progress = 0;
+        switch (status.status) {
+          case 'IN_QUEUE':
+            progress = 10;
+            break;
+          case 'IN_PROGRESS':
+            progress = 50;
+            break;
+          case 'COMPLETED':
+            progress = 100;
+            break;
+          case 'FAILED':
+            logStep('Generation Failed', {
+              status: status.status,
+              error: status.output?.error || 'Unknown error'
+            });
+            break;
+        }
+
+        // Log progress
+        logStep('Progress', { progress });
+
+        // Handle logs if present
+        if (status.logs && status.logs.length > 0) {
+          status.logs.forEach((log, index) => {
+            logStep(`Progress Message ${index + 1}`, {
+              message: log.message,
+              timestamp: new Date().toISOString()
+            });
+          });
+        }
+
+        // Special handling for completion
+        if (status.status === 'COMPLETED') {
+          logStep('Generation Completed', {
+            hasOutput: !!status.output,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     });
 
-    console.log('Prediction created:', prediction);
+    logStep('API Response Received', {
+      hasData: !!result.data,
+      hasImages: !!result.data?.images,
+      imageCount: result.data?.images?.length || 0
+    });
 
-    // Wait for the prediction to complete
-    console.log('Waiting for prediction to complete...');
-    const finalPrediction = await waitForPrediction(replicate, prediction);
-    console.log('Final prediction:', finalPrediction);
-
-    // The output should now be an array of URLs
-    if (!finalPrediction.output || !Array.isArray(finalPrediction.output)) {
-      console.log('Invalid prediction output:', finalPrediction);
-      throw new Error('Invalid prediction output format');
+    // Validate the response
+    if (!result.data?.images?.[0]) {
+      throw new Error('Invalid response format from API: Missing image data');
     }
 
-    // Get the first URL from the output array
-    const imageUrl = finalPrediction.output[0];
-    console.log('Generated image URL:', imageUrl);
-
-    if (typeof imageUrl !== 'string') {
-      console.log('Invalid image URL type:', typeof imageUrl);
-      throw new Error('Invalid image URL format');
-    }
+    const imageUrl = result.data.images[0].url;
+    logStep('Success', {
+      imageUrl,
+      contentType: result.data.images[0].content_type
+    });
 
     return {
       success: true,
       output: imageUrl,
     };
+
   } catch (error) {
-    console.error('Detailed error in generateImage:', {
-      error,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      errorStack: error instanceof Error ? error.stack : undefined,
+    logStep('Error', {
+      error: error instanceof Error ? {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      } : error
     });
     
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'An unexpected error occurred',
+      error: error instanceof Error ? error.message : 'An unexpected error occurred'
     };
   }
 }
